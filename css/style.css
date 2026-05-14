@@ -1,3 +1,30 @@
+/* ─── ANIMACION DE CARGA ────────────────────────────────────────────────────── */
+#intro-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 2000;
+  pointer-events: none;
+  overflow: hidden;
+  transition: background var(--t);
+}
+
+#intro-creative,
+#intro-lab {
+  position: absolute;
+  font-family: 'Geist Mono', monospace;
+  font-size: clamp(68px, 10.5vw, 148px);
+  font-weight: 200;
+  line-height: 0.88;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+  color: var(--text);
+  transition: color var(--t);
+}
+
+#intro-creative { top: 7vh;    left: 4vw; }
+#intro-lab      { bottom: 7vh; right: 4vw; }
+
 /* ─── RESET & VARS ─────────────────────────────────────────────────────────── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -384,6 +411,14 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
 .footer-right { display: flex; gap: 28px; }
 #clock { font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
 
+/* ─── DITHER REVEAL ─────────────────────────────────────────────────────────── */
+#dither-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12; /* above hero (10), below cards-layer (200) */
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    HERO
 ════════════════════════════════════════════════════════════════════════════════ */
@@ -432,7 +467,8 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
 }
 
 /* blinking cursor while typing */
-.hero-tagline.typing::after {
+.hero-tagline.typing::after,
+.hero-para.typing::after {
   content: '|';
   margin-left: 1px;
   animation: cur-blink 0.55s steps(1) infinite;
@@ -441,6 +477,10 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
+
+.headline-wrap { position: relative; pointer-events: auto; }
+
+
 
 .headline {
   font-size: clamp(68px, 10.5vw, 148px);
@@ -463,7 +503,7 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
 
 /* ─── HERO PARAGRAPH (scroll-typed) ─────────────────────────────────────────── */
 .hero-para-wrap {
-  min-height: 3.4em;      /* 2 lines at 1.6 line-height */
+  min-height: 0;          /* set dynamically by JS based on actual rendered height */
   display: flex;
   align-items: flex-start;
   justify-content: center;

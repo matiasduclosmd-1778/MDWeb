@@ -1,4 +1,10 @@
 /* ─── MAIN.JS ───────────────────────────────────────────────────────────────── */
+import * as THREE from 'three';
+import { gsap } from 'gsap';
+import { SplitText } from 'gsap/SplitText';
+import Lenis from '@studio-freight/lenis';
+
+gsap.registerPlugin(SplitText);
 
 // ─── GLSL SHADERS ────────────────────────────────────────────────────────────
 
@@ -112,8 +118,7 @@ const heroParaWrapEl = document.getElementById('heroParaWrap');
 const heroParaEl     = document.getElementById('heroPara');
 
 const PARA_TEXT =
-  "UX Designer discovering the world of development. Design experiments using Figma, AI and Adobe CC.\n" +
-  "Visit my Twitter to learn more about the project.";
+  "UX Designer discovering the world of development. Design experiments using Figma, AI and Adobe CC.";
 
 let isDark      = false;
 let isPanelOpen = false;
@@ -130,12 +135,16 @@ document.fonts.ready.then(() => {
   setupCards();
   setupMagnetic();
   setupEffects();
+
   setupPanel();
-  splitAndAnimateHeadline();
   setupDarkMode();
   setupClock();
   setupSectionNav();
   setupLabChips();
+  setupDitherReveal();
+  setupIntro();              // mide headline → arranca animación de carga
+  splitAndAnimateHeadline(); // corre inmediatamente BAJO el overlay (invisible)
+  setupHeadlineWeightHover();
 });
 
 // ─── THREE.JS BACKGROUND ────────────────────────────────────────────────────
@@ -242,51 +251,16 @@ function splitAndAnimateHeadline() {
     el.appendChild(clip);
   });
 
-  // Nav + footer
-  gsap.from('.navbar > *',      { y: -18, opacity: 0, duration: 0.6, stagger: 0.08, ease: 'power3.out', delay: 0.1 });
-  gsap.from('.site-footer > *', { y: 14,  opacity: 0, duration: 0.6, stagger: 0.1,  ease: 'power3.out', delay: 0.2 });
+  // Pre-reserva altura final para que el flex layout no se mueva durante el typing
+  heroParaEl.textContent = PARA_TEXT;
+  heroParaWrapEl.style.minHeight = heroParaWrapEl.getBoundingClientRect().height + 'px';
+  heroParaEl.textContent = '';
 
-  // 1. Avatar appears
-  gsap.to(heroMsgEl, { opacity: 1, duration: 0.45, ease: 'power2.out', delay: 0.35 });
-
-  // 2. Type "Hi, this is my"
-  const MSG   = 'Hi, this is my';
-  const SPEED = 52;
-  setTimeout(() => {
-    heroTaglineEl.classList.add('typing');
-    let i = 0;
-    const iv = setInterval(() => {
-      heroTaglineEl.textContent += MSG[i++];
-      if (i >= MSG.length) {
-        clearInterval(iv);
-        setTimeout(() => heroTaglineEl.classList.remove('typing'), 650);
-      }
-    }, SPEED);
-  }, 480);
-
-  // 3. Liquid reveal after typing finishes
-  const headlineDelay = 0.0;
-  liquidReveal(el, headlineDelay);
-
-  // 4. Buttons after liquid settles
-
-  gsap.from('#heroBtns', { opacity: 0, y: 18, duration: 0.8, ease: 'power3.out', delay: headlineDelay + 1.6 });
-
-  // Para split-text — starts right after headline solidifies
-  heroParaEl.innerHTML = '';
-  setTimeout(() => {
-    let i = 0;
-    const iv = setInterval(() => {
-      if (i < PARA_TEXT.length) { _addParaChar(PARA_TEXT[i]); i++; }
-      else clearInterval(iv);
-    }, 22);
-  }, (headlineDelay + 0.5) * 1000);
 }
 
 // ── Split-text: each char slides up from clip ────────────────────────────────
 function _addParaChar(ch) {
   if (ch === '\n') {
-    _paraBreakPos = heroParaEl.childNodes.length;
     heroParaEl.appendChild(document.createElement('br'));
     return;
   }
@@ -571,33 +545,24 @@ function setupPanel() {
 
 // ─── EFFECTS ─────────────────────────────────────────────────────────────────
 function setupEffects() {
+  // Headline hover: show scramble mask (handled in setupScrambleMask)
+  // Buttons still get the analog inversion
   const LIGHT = '#F4F3EE';
   const DARK  = '#111111';
-  const fg    = () => isDark ? DARK  : LIGHT;  // contrasting foreground
-  const bg    = () => isDark ? LIGHT : DARK;   // contrasting background
-
-  const targets = [overlayEl, headlineEl, '.hero-btn'];
+  const fg    = () => isDark ? DARK  : LIGHT;
+  const bg    = () => isDark ? LIGHT : DARK;
 
   headlineEl.addEventListener('mouseenter', () => {
-    gsap.killTweensOf(targets);
-
-    // Snap in — fast like a photographic negative flip
-    gsap.to(overlayEl,   { opacity: 1,    duration: 0.07, ease: 'none' });
-    gsap.to(headlineEl,  { color: fg(),   duration: 0.05 });
+    gsap.killTweensOf(['.hero-btn']);
     gsap.to('.hero-btn', { color: fg(), borderColor: fg(), duration: 0.05 });
   });
-
   headlineEl.addEventListener('mouseleave', () => {
-    gsap.killTweensOf(targets);
-
-    // Release slightly slower — like film re-exposing
-    gsap.to(overlayEl,   { opacity: 0, duration: 0.22, ease: 'power1.in' });
-    gsap.to(headlineEl,  { color: bg(), duration: 0.18,
-      onComplete: () => gsap.set(headlineEl, { clearProps: 'color' }) });
+    gsap.killTweensOf(['.hero-btn']);
     gsap.to('.hero-btn', { color: bg(), borderColor: bg(), duration: 0.18,
       onComplete: () => gsap.set('.hero-btn', { clearProps: 'color,borderColor' }) });
   });
 }
+
 
 // ─── DARK MODE ───────────────────────────────────────────────────────────────
 function setupDarkMode() {
@@ -702,4 +667,290 @@ function updateSectionNavActive(progress, labProgress) {
   items.forEach(item => {
     item.classList.toggle('active', item.dataset.section === active);
   });
+}
+
+// ─── ANIMACION DE CARGA ──────────────────────────────────────────────────────
+function setupIntro() {
+  const overlay  = document.getElementById('intro-overlay');
+  const creative = document.getElementById('intro-creative');
+  const lab      = document.getElementById('intro-lab');
+
+  if (!overlay) { splitAndAnimateHeadline(); return; }
+
+  // Todo oculto desde el inicio (bajo el overlay)
+  gsap.set('.navbar, .site-footer', { opacity: 0 });
+  gsap.set([heroMsgEl, heroBtnsEl, heroParaWrapEl], { opacity: 0 });
+
+  // Probe element: mide dónde quedarían las palabras en la posición exacta del headline
+  const hlStyle = getComputedStyle(headlineEl);
+  const hlRect  = headlineEl.getBoundingClientRect();
+
+  const probe = document.createElement('div');
+  probe.style.cssText = [
+    'position:fixed', 'visibility:hidden', 'pointer-events:none',
+    `top:${hlRect.top}px`, 'left:50%', 'transform:translateX(-50%)',
+    `font-family:${hlStyle.fontFamily}`,
+    `font-size:${hlStyle.fontSize}`,
+    'font-weight:900',
+    `letter-spacing:${hlStyle.letterSpacing}`,
+    'text-transform:uppercase',
+    'white-space:nowrap',
+    `line-height:${hlStyle.lineHeight}`,
+  ].join(';');
+  probe.innerHTML = '<span id="_pc">CREATIVE</span> <span id="_pl">LAB.</span>';
+  document.body.appendChild(probe);
+
+  const tC = probe.querySelector('#_pc').getBoundingClientRect();
+  const tL = probe.querySelector('#_pl').getBoundingClientRect();
+  document.body.removeChild(probe);
+
+  // Posiciones iniciales (esquinas)
+  const cRect = creative.getBoundingClientRect();
+  const lRect = lab.getBoundingClientRect();
+
+  // Deltas totales (inicio → destino final)
+  const cDX = tC.left - cRect.left;
+  const cDY = tC.top  - cRect.top;
+  const lDX = tL.left - lRect.left;
+  const lDY = tL.top  - lRect.top;
+
+  const tl = gsap.timeline({
+    onComplete() {
+      overlay.remove();
+
+      const D = 0.4; // delay base
+
+      // Navbar y footer
+      gsap.fromTo('.navbar',
+        { y: -24, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out', delay: D }
+      );
+      gsap.fromTo('.site-footer',
+        { y: 10, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out', delay: D + 0.05 }
+      );
+
+      // Hero elements — soft fade + ligero slide desde abajo
+      gsap.fromTo(heroMsgEl,
+        { y: 10, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out', delay: D }
+      );
+      gsap.fromTo(heroBtnsEl,
+        { y: 10, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out', delay: D + 0.08 }
+      );
+      gsap.fromTo(heroParaWrapEl,
+        { y: 10, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out', delay: D + 0.12 }
+      );
+
+      // Typing — arranca al mismo tiempo que el fade
+      setTimeout(() => {
+        // Tagline "Hi, this is my"
+        const MSG = 'Hi, this is my';
+        heroTaglineEl.classList.add('typing');
+        let ti = 0;
+        const tiv = setInterval(() => {
+          heroTaglineEl.textContent += MSG[ti++];
+          if (ti >= MSG.length) {
+            clearInterval(tiv);
+            setTimeout(() => heroTaglineEl.classList.remove('typing'), 650);
+          }
+        }, 52);
+
+        // Párrafo
+        heroParaEl.classList.add('typing');
+        let pi = 0;
+        const piv = setInterval(() => {
+          heroParaEl.textContent += PARA_TEXT[pi++];
+          if (pi >= PARA_TEXT.length) {
+            clearInterval(piv);
+            setTimeout(() => heroParaEl.classList.remove('typing'), 650);
+          }
+        }, 52);
+      }, D * 1000);
+    },
+  });
+
+  // Peso tipográfico: 200 → 900 a lo largo de toda la animación
+  tl.to([creative, lab], {
+    fontWeight: 900,
+    duration: 1.85,
+    ease: 'power2.inOut',
+  }, 0)
+
+  // Fase 1 — convergencia vertical (CREATIVE baja, LAB. sube)
+  .to(creative, { y: cDY, duration: 1.0, ease: 'power3.inOut' }, 0)
+  .to(lab,      { y: lDY, duration: 1.0, ease: 'power3.inOut' }, 0)
+
+  // Fase 2 — convergencia horizontal al centro del headline
+  .to(creative, { x: cDX, duration: 0.85, ease: 'expo.inOut' }, 1.0)
+  .to(lab,      { x: lDX, duration: 0.85, ease: 'expo.inOut' }, 1.0);
+}
+
+// ─── HEADLINE WEIGHT HOVER ───────────────────────────────────────────────────
+function setupHeadlineWeightHover() {
+  const wrap  = document.getElementById('headlineWrap');
+  const chars = Array.from(headlineEl.querySelectorAll('.char-inner'));
+  if (!wrap || !chars.length) return;
+
+  const RADIUS = 110; // px — radio de influencia por letra
+
+  // Cachea el centro de cada letra (se actualiza en resize)
+  let rects = [];
+  function cacheRects() {
+    rects = chars.map(c => {
+      const r = c.getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    });
+  }
+  cacheRects();
+  window.addEventListener('resize', cacheRects);
+
+  wrap.addEventListener('mousemove', e => {
+    chars.forEach((c, i) => {
+      const dist = Math.hypot(e.clientX - rects[i].cx, e.clientY - rects[i].cy);
+      const t      = Math.max(0, 1 - dist / RADIUS);          // 0=lejos  1=encima
+      const weight = Math.round(lerp(900, 100, t * t));        // ease cuadrático
+
+      gsap.to(c, {
+        fontWeight: weight,
+        duration: 0.3,
+        ease: 'power2.out',
+        overwrite: 'auto',
+      });
+    });
+  });
+
+  wrap.addEventListener('mouseleave', () => {
+    // Vuelven al peso actual del padre (scroll-based) y limpian override
+    const parentW = parseFloat(headlineEl.style.fontWeight) || 900;
+    chars.forEach(c => {
+      gsap.to(c, {
+        fontWeight: parentW,
+        duration: 0.55,
+        ease: 'power2.out',
+        overwrite: 'auto',
+        onComplete() { gsap.set(c, { clearProps: 'fontWeight' }); },
+      });
+    });
+  });
+}
+
+// ─── DITHER REVEAL ───────────────────────────────────────────────────────────
+function setupDitherReveal() {
+  const canvas = document.createElement('canvas');
+  canvas.id    = 'dither-canvas';
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+
+  // 8×8 Bayer ordered-dither matrix (values 0..63)
+  const B = [
+    [ 0,32, 8,40, 2,34,10,42],
+    [48,16,56,24,50,18,58,26],
+    [12,44, 4,36,14,46, 6,38],
+    [60,28,52,20,62,30,54,22],
+    [ 3,35,11,43, 1,33, 9,41],
+    [51,19,59,27,49,17,57,25],
+    [15,47, 7,39,13,45, 5,37],
+    [63,31,55,23,61,29,53,21],
+  ];
+
+  const PIXEL = 5;   // dot grid pitch (px)
+  const DOT   = 4;   // rendered dot size (gap of 1px between dots)
+  const MAX_R = 52;  // circle radius → ~104px diameter
+
+  let mx = 0, my = 0;   // raw mouse / touch target
+  let sx = 0, sy = 0;   // smoothed position
+  let sr = 0, tr = 0;   // smoothed / target radius
+  let snapped = false;  // avoid slide-in from (0,0) on first move
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Mouse tracking
+  document.addEventListener('mousemove', e => {
+    if (!snapped) { sx = e.clientX; sy = e.clientY; snapped = true; }
+    mx = e.clientX;
+    my = e.clientY;
+    tr = MAX_R;
+  });
+  document.addEventListener('mouseleave', () => { tr = 0; });
+
+  // Touch: tap-drag reveals the effect
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    sx = t.clientX; sy = t.clientY;
+    mx = t.clientX; my = t.clientY;
+    tr = MAX_R; snapped = true;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    mx = t.clientX; my = t.clientY;
+    tr = MAX_R;
+  }, { passive: true });
+  document.addEventListener('touchend',    () => { tr = 0; });
+  document.addEventListener('touchcancel', () => { tr = 0; });
+
+  let lastAlpha = -1;
+  let time = 0;
+
+  function draw() {
+    time += 0.055;
+
+    // Softer lerp → smoother, more fluid cursor feel
+    sx += (mx - sx) * 0.07;
+    sy += (my - sy) * 0.07;
+    sr += (tr - sr) * 0.07;
+
+    // Trail fade: destination-out erases existing dots ~10% per frame.
+    // Sparse-edge dots vanish first → trail appears to "close inward" naturally.
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,0.10)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Fade canvas out as hero scrolls away (mirrors updateHeadline timing)
+    const THR      = window.innerHeight * 1.8;
+    const progress = Math.min(1, scrollY / THR);
+    const alpha    = 1 - smoothstep(Math.max(0, Math.min(1, (progress - 0.35) / 0.35)));
+    if (Math.abs(alpha - lastAlpha) > 0.004) {
+      canvas.style.opacity = alpha;
+      lastAlpha = alpha;
+    }
+
+    if (sr > 0.5 && alpha > 0.01) {
+      const r  = sr;
+      const c0 = Math.floor((sx - r) / PIXEL) - 1;
+      const c1 = Math.ceil ((sx + r) / PIXEL) + 1;
+      const r0 = Math.floor((sy - r) / PIXEL) - 1;
+      const r1 = Math.ceil ((sy + r) / PIXEL) + 1;
+
+      ctx.fillStyle = isDark ? '#eeeeee' : '#111111';
+
+      for (let row = r0; row <= r1; row++) {
+        for (let col = c0; col <= c1; col++) {
+          const cx   = col * PIXEL + PIXEL * 0.5;
+          const cy   = row * PIXEL + PIXEL * 0.5;
+          const dist = Math.hypot(cx - sx, cy - sy);
+          if (dist >= r) continue;
+
+          const density = 1 - dist / r;
+          const bayer   = B[((row % 8) + 8) % 8][((col % 8) + 8) % 8] / 64;
+          const wave    = Math.sin(time - dist / 12) * 0.26;
+
+          if (density > bayer + wave) ctx.fillRect(col * PIXEL, row * PIXEL, DOT, DOT);
+        }
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  requestAnimationFrame(draw);
 }

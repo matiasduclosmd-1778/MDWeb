@@ -14,6 +14,12 @@
 <body>
 
   <!-- Cursor — outside stage so it stays viewport-relative -->
+  <!-- ─── ANIMACION DE CARGA ──────────────────────────────────────── -->
+  <div id="intro-overlay">
+    <span id="intro-creative">CREATIVE</span>
+    <span id="intro-lab">LAB.</span>
+  </div>
+
   <div class="cursor" id="cursor">
     <img class="cursor-face" id="cursorFace" src="img/cursor-1.png" draggable="false" alt="" />
   </div>
@@ -152,7 +158,9 @@
         <div class="hero-avatar">MD</div>
         <h2 class="hero-tagline" id="heroTagline"></h2>
       </div>
-      <h1 class="headline" id="headline" aria-label="Creative Lab.">Creative Lab.</h1>
+      <div class="headline-wrap" id="headlineWrap">
+        <h1 class="headline" id="headline" aria-label="Creative Lab.">Creative Lab.</h1>
+      </div>
       <div class="hero-para-wrap" id="heroParaWrap">
         <p class="hero-para" id="heroPara"></p>
       </div>
@@ -220,10 +228,6 @@
   </div><!-- /stage -->
 
 
-  <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
-  <script src="js/main.js"></script>
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>

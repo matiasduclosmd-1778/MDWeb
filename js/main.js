@@ -99,6 +99,8 @@ const stageEl      = document.getElementById('stage');
 const matiMenuEl  = document.getElementById('matiMenu');
 const heroMsgEl    = document.getElementById('heroMessage');
 const heroTaglineEl= document.getElementById('heroTagline');
+const labSectionEl  = document.getElementById('labSection');
+const darkOverlayEl = document.getElementById('darkOverlay');
 
 let isDark      = false;
 let isPanelOpen = false;
@@ -346,8 +348,28 @@ function setupCards() {
   });
 }
 
-// THRESHOLD: full animation completes after scrolling this many px
-const THRESHOLD = () => window.innerHeight * 1.8;
+// THRESHOLD: Works animation completes after scrolling this many px
+const THRESHOLD     = () => window.innerHeight * 1.8;
+// LAB appears after Works, over the next 0.8 viewport heights
+const LAB_DURATION  = () => window.innerHeight * 0.8;
+const getLabProgress = () =>
+  Math.max(0, Math.min(1, (scrollY - THRESHOLD()) / LAB_DURATION()));
+
+function updateLab(lp) {
+  const t = smoothstep(lp);
+
+  // 1. WebGL canvas darkens
+  if (threeState.uniforms) {
+    threeState.uniforms.uDark.value = Math.min(1, (isDark ? 1 : 0) + t);
+  }
+
+  // 2. Full-page dark overlay
+  darkOverlayEl.style.opacity = lerp(0, 0.94, t);
+
+  // 3. LAB section — starts fading in at 20% progress
+  labSectionEl.style.opacity   = smoothstep(Math.max(0, (lp - 0.2) / 0.8));
+  labSectionEl.style.transform = `translateY(${lerp(50, 0, easeOutQuad(lp))}px)`;
+}
 
 function updateHeadline(progress) {
   const wt     = smoothstep(Math.min(1, progress / 0.55));
@@ -363,12 +385,15 @@ function updateHeadline(progress) {
 }
 
 function updateCards() {
-  const progress = Math.max(0, Math.min(1, scrollY / THRESHOLD()));
+  const progress    = Math.max(0, Math.min(1, scrollY / THRESHOLD()));
+  const labProgress = getLabProgress();
+
   updateHeadline(progress);
-  const P1 = 0.42; // fan → scatter split
+  updateLab(labProgress);
+
+  const P1 = 0.42;
 
   cardEls.forEach((el, i) => {
-    // slight stagger: outer cards start a hair later for organic bloom
     const delay = Math.abs(i - 2) * 0.018;
     const p     = Math.max(0, Math.min(1, (progress - delay) / (1 - delay * 2)));
 
@@ -377,19 +402,26 @@ function updateCards() {
     let x, y, rot, scale, opacity;
 
     if (p <= P1) {
-      const t = smoothstep(p / P1);           // soft in-out rise
+      const t = smoothstep(p / P1);
       x       = lerp(-HW,        fan.x - HW, t);
       y       = lerp(420,        fan.y,       t);
       rot     = lerp(0,          fan.rot,     t);
       scale   = lerp(0.78,       1,           t);
       opacity = smoothstep(Math.min(1, (p / P1) * 1.6));
     } else {
-      const t = easeOutQuad((p - P1) / (1 - P1));  // gentle settle on scatter
+      const t = easeOutQuad((p - P1) / (1 - P1));
       x       = lerp(fan.x - HW,  scatter.x - HW, t);
       y       = lerp(fan.y,        scatter.y,       t);
       rot     = lerp(fan.rot,      scatter.rot,     t);
       scale   = 1;
       opacity = 1;
+    }
+
+    // LAB transition: Works cards fly off upward
+    if (labProgress > 0) {
+      const lp = smoothstep(labProgress);
+      y       += lerp(0, -window.innerHeight * 1.4, lp);
+      opacity  = lerp(opacity, 0, smoothstep(Math.min(1, labProgress * 1.8)));
     }
 
     el.style.transform = `translateX(${x}px) translateY(${y}px) rotate(${rot}deg) scale(${scale})`;
@@ -534,3 +566,4 @@ function tick(time) {
     renderer.render(scene, camera);
   }
 }
+

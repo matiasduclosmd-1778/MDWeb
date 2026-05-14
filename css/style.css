@@ -16,7 +16,7 @@ html.dark {
 html, body {
   font-family: 'Geist Mono', monospace;
   background: var(--bg);
-  height: 360vh;          /* scroll room for card animation */
+  height: 420vh;          /* scroll room for Works + LAB transition */
   cursor: none;
   overflow-x: hidden;
   transition: background var(--t);
@@ -508,3 +508,49 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
 .c4 { background: radial-gradient(circle at 65% 35%, #1e1918 0%, #100d0c 100%); }
 .c5 { background: radial-gradient(circle at 50% 50%, #1a1e18 0%, #0f1210 100%); }
 
+
+/* ─── DARK OVERLAY (Works → Lab transition) ─────────────────────────────────── */
+#darkOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #0d0d0d;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LAB
+════════════════════════════════════════════════════════════════════════════════ */
+.lab-section {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  opacity: 0;
+  pointer-events: none;
+}
+.lab-tag {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(244,243,238,0.4);
+  border: 1px solid rgba(244,243,238,0.2);
+  border-radius: 100px;
+  padding: 6px 16px;
+}
+.lab-title {
+  font-size: clamp(64px, 10vw, 138px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+  color: #F4F3EE;
+  text-align: center;
+}

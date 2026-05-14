@@ -189,12 +189,12 @@ function setupCursor() {
 
   // Click: swap face
   document.addEventListener('mousedown', () => {
-    faceEl.src = 'IMG/cursor-2.png';
+    faceEl.src = 'img/cursor-2.png';
     document.body.classList.remove('cur-hover');
     document.body.classList.add('cur-down');
   });
   document.addEventListener('mouseup', () => {
-    faceEl.src = 'IMG/cursor-1.png';
+    faceEl.src = 'img/cursor-1.png';
     document.body.classList.remove('cur-down');
   });
 }

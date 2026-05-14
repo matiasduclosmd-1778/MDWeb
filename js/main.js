@@ -317,6 +317,14 @@ buildScatter();
 const cardEls = ['pc0','pc1','pc2','pc3','pc4'].map(id => document.getElementById(id));
 
 function setupCards() {
+  // Click → open project URL
+  cardEls.forEach(card => {
+    const url = card.dataset.url;
+    if (url) {
+      card.addEventListener('click', () => window.open(url, '_blank'));
+    }
+  });
+
   // 3D tilt on hover
   cardEls.forEach(card => {
     const thumb = card.querySelector('.card-thumb');

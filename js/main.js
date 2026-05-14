@@ -446,10 +446,11 @@ function setupPanel() {
   gsap.set(matiMenuEl, { x: '-100%' });
   gsap.set(stageEl,    { x: 0 });
 
-  document.getElementById('navBrand').addEventListener('click', () => {
+  document.getElementById('navBrand').addEventListener('click', (e) => {
+    e.stopPropagation();
     isPanelOpen ? closePanel() : openPanel();
   });
-  document.getElementById('panelClose').addEventListener('click', closePanel);
+  document.getElementById('panelClose').addEventListener('click', (e) => { e.stopPropagation(); closePanel(); });
 
   stageEl.addEventListener('click', () => { if (isPanelOpen) closePanel(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && isPanelOpen) closePanel(); });

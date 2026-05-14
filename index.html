@@ -98,23 +98,12 @@
     </div>
   </aside>
 
-  <!-- SVG filters (hidden) -->
-  <svg id="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
-    <defs>
-      <filter id="liquid-reveal" color-interpolation-filters="sRGB" x="-30%" y="-30%" width="160%" height="160%">
-        <feTurbulence id="ft-turb" type="fractalNoise" baseFrequency="0.048 0.042" numOctaves="4" result="noise" seed="7"/>
-        <feDisplacementMap id="ft-disp" in="SourceGraphic" in2="noise" scale="110" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
-    </defs>
-  </svg>
-
   <!-- ═══════════════════════════════════════
        STAGE — shifts right when MatiMenu opens
   ════════════════════════════════════════ -->
   <div id="stage">
 
     <canvas id="bg-canvas"></canvas>
-    <div id="colorOverlay"></div>
 
     <!-- Nav -->
     <nav class="navbar" id="navbar">
@@ -122,9 +111,9 @@
         <img class="nav-logo" src="img/ico.jpg" alt="Mati Duclós" />
         <span>Mati Duclós</span>
       </button>
-      <button class="nav-btn" id="darkToggle" data-magnetic>
-        <span class="nav-dot"></span>
-        <span>Dark Mode</span>
+      <button class="nav-switch" id="darkToggle" data-magnetic>
+        <span class="switch-label"></span>
+        <span class="switch-track"></span>
       </button>
     </nav>
 
@@ -138,18 +127,9 @@
 
     <!-- Section indicator -->
     <nav class="section-nav" id="sectionNav">
-      <button class="section-nav-item" data-section="home">
-        <span class="section-nav-label">Home</span>
-        <span class="section-nav-dot"></span>
-      </button>
-      <button class="section-nav-item" data-section="works">
-        <span class="section-nav-label">Works</span>
-        <span class="section-nav-dot"></span>
-      </button>
-      <button class="section-nav-item" data-section="lab">
-        <span class="section-nav-label">Lab</span>
-        <span class="section-nav-dot"></span>
-      </button>
+      <button class="section-nav-item" data-section="home">Home</button>
+      <button class="section-nav-item" data-section="works">Works</button>
+      <button class="section-nav-item" data-section="lab">Lab</button>
     </nav>
 
     <!-- ─── HERO ──────────────────────────── -->
@@ -168,7 +148,7 @@
       <div class="hero-btns" id="heroBtns">
         <a href="https://x.com/matiduclos" target="_blank" class="hero-btn" data-magnetic>Check my X</a>
         <a href="https://1778-web.vercel.app/" target="_blank" class="hero-btn" data-magnetic>Check 1778Studio</a>
-        <a href="https://github.com/matiasduclosmd-1778" target="_blank" class="hero-btn" data-magnetic>Look my Github</a>
+        <a href="https://github.com/matiasduclosmd-1778" target="_blank" class="hero-btn hero-btn--primary" data-magnetic>Look my Github</a>
       </div>
     </section>
 
@@ -208,25 +188,524 @@
 
       <div class="lab-chips">
         <button class="lab-chip" data-lab="accessibility">Accessibility important</button>
-        <button class="lab-chip" data-lab="design-system">How to create Design System</button>
-        <button class="lab-chip" data-lab="prompting">Prompting x epic webapps</button>
+        <button class="lab-chip" data-lab="audit">Get Accessibility Audit</button>
       </div>
 
       <div class="lab-content" id="labContent">
         <div class="lab-panel" data-panel="accessibility">
           <span class="lab-coming">Content in progress</span>
         </div>
-        <div class="lab-panel" data-panel="design-system">
-          <span class="lab-coming">Content in progress</span>
-        </div>
-        <div class="lab-panel" data-panel="prompting">
-          <span class="lab-coming">Content in progress</span>
+        <div class="lab-panel" data-panel="audit">
+          <div class="audit-wrap">
+            <div class="audit-header">
+              <span class="audit-title">WCAG 2.1 AA — Skill Prompt</span>
+              <button class="audit-copy" id="auditCopyBtn" aria-label="Copy skill to clipboard">
+                <i class="ri-clipboard-line" aria-hidden="true"></i>
+                <span id="auditCopyLabel">Copy</span>
+              </button>
+            </div>
+            <div class="audit-terminal">
+              <pre class="audit-pre"><code id="auditCode"></code></pre>
+            </div>
+            <p class="audit-hint">Pegá este skill en Claude.ai para auditar cualquier sitio contra WCAG 2.1 AA.</p>
+          </div>
         </div>
       </div>
     </section>
 
   </div><!-- /stage -->
 
+  <!-- ─── ACCESSIBILITY SECTION ───────────────────────────────────── -->
+  <!-- ─── ACCESSIBILITY SECTION ───────────────────────────────────── -->
+  <section id="accessSection" data-lenis-prevent aria-label="Playground de accesibilidad web">
+
+    <!-- Skip link -->
+    <a class="ac-skip" href="#ac-contrast" data-i18n="nav.skip">Ir al contenido</a>
+
+    <!-- Top bar: back button + lang switch -->
+    <div class="ac-topbar">
+      <button class="access-back" id="accessBack" aria-label="Volver" data-i18n-label="nav.back">
+        <i class="ri-arrow-left-line" aria-hidden="true"></i>
+        <span data-i18n="nav.back">Volver</span>
+      </button>
+      <div class="ac-lang-switch" role="group" aria-label="Language / Idioma">
+        <button class="ac-lang-btn" id="acLangEs" data-lang="es" aria-pressed="true" lang="es">ES</button>
+        <button class="ac-lang-btn" id="acLangEn" data-lang="en" aria-pressed="false" lang="en">EN</button>
+      </div>
+    </div>
+
+    <div class="ac-scroll">
+
+      <!-- HERO -->
+      <header class="ac-hero">
+        <p class="ac-tag" data-i18n="hero.tag">#Lab · Accesibilidad</p>
+        <h1 class="ac-title">
+          <span data-i18n="hero.h1a">Accesibilidad</span><br>
+          <span data-i18n="hero.h1b">importante</span>
+        </h1>
+        <p class="ac-hero-lead" data-i18n="hero.lead">Siete estaciones interactivas para entender por qué el diseño accesible es simplemente mejor diseño.</p>
+        <div class="ac-stats" aria-label="Estadísticas de accesibilidad">
+          <div class="ac-stat">
+            <span class="ac-stat-num" data-i18n="hero.stat1num">1 de 6</span>
+            <span class="ac-stat-label" data-i18n="hero.stat1lbl">personas viven con alguna discapacidad</span>
+          </div>
+          <div class="ac-stat">
+            <span class="ac-stat-num" data-i18n="hero.stat2num">71%</span>
+            <span class="ac-stat-label" data-i18n="hero.stat2lbl">de usuarios con discapacidad abandona sitios inaccesibles</span>
+          </div>
+          <div class="ac-stat">
+            <span class="ac-stat-num" data-i18n="hero.stat3num">96%</span>
+            <span class="ac-stat-label" data-i18n="hero.stat3lbl">de homepages tienen al menos un error WCAG detectable</span>
+            <span class="ac-stat-src" data-i18n="hero.stat3src">WebAIM Million · 2024</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- 01 CONTRAST -->
+      <section class="ac-station" id="ac-contrast" aria-labelledby="ac-contrast-title">
+        <header class="ac-station-header">
+          <span class="ac-station-num" data-i18n="c01.num">01</span>
+          <h2 class="ac-station-title" id="ac-contrast-title" data-i18n="c01.title">Contraste de color</h2>
+        </header>
+        <p class="ac-station-desc" data-i18n="c01.desc">El contraste de color es la falla de accesibilidad más común. WCAG 2.1 requiere 4.5:1 para texto normal (AA) y 7:1 para nivel mejorado (AAA). El ratio 3:1 aplica a texto grande (≥18pt) y componentes UI.</p>
+        <div class="ac-card">
+          <div class="ac-contrast-grid">
+            <div class="ac-color-field">
+              <label class="ac-label" for="acFgPicker" data-i18n="c01.fg">Color de texto</label>
+              <div class="ac-color-input-wrap">
+                <input type="color" id="acFgPicker" value="#111111" />
+                <input type="text" id="acFgHex" value="#111111" maxlength="7" spellcheck="false" aria-label="Hex del color de texto" />
+              </div>
+            </div>
+            <div class="ac-color-field">
+              <label class="ac-label" for="acBgPicker" data-i18n="c01.bg">Color de fondo</label>
+              <div class="ac-color-input-wrap">
+                <input type="color" id="acBgPicker" value="#F4F3EE" />
+                <input type="text" id="acBgHex" value="#F4F3EE" maxlength="7" spellcheck="false" aria-label="Hex del color de fondo" />
+              </div>
+            </div>
+            <div class="ac-presets-col">
+              <span class="ac-label" data-i18n="c01.presets">Presets rápidos</span>
+              <div class="ac-preset-row">
+                <button class="ac-preset-btn" data-fg="#111111" data-bg="#F4F3EE"
+                  aria-label="Negro sobre crema · Pasa AAA" data-i18n-label="c01.preset1"
+                  data-i18n="c01.preset1">Negro sobre crema · Pasa AAA</button>
+                <button class="ac-preset-btn" data-fg="#888888" data-bg="#DDDDDD"
+                  aria-label="Gris medio · Falla AA" data-i18n-label="c01.preset2"
+                  data-i18n="c01.preset2">Gris medio · Falla AA</button>
+                <button class="ac-preset-btn" data-fg="#FFCC00" data-bg="#FFFFFF"
+                  aria-label="Amarillo sobre blanco · Falla" data-i18n-label="c01.preset3"
+                  data-i18n="c01.preset3">Amarillo sobre blanco · Falla</button>
+                <button class="ac-preset-btn" data-fg="#1565C0" data-bg="#FFFFFF"
+                  aria-label="Azul sistema · Pasa AA" data-i18n-label="c01.preset4"
+                  data-i18n="c01.preset4">Azul sistema · Pasa AA</button>
+              </div>
+            </div>
+          </div>
+          <div class="ac-contrast-preview" id="acPreview">
+            <div class="ac-preview-inner" id="acPreviewInner">
+              <p class="ac-preview-text" id="acPreviewText" data-i18n="c01.previewText">El diseño accesible beneficia a todos. Los textos con bajo contraste son difíciles de leer bajo luz solar directa, para personas con baja visión, o con ojos cansados. No es solo para usuarios con discapacidad.</p>
+              <button class="ac-preview-btn" id="acPreviewMore" data-i18n="c01.more">Leer más texto</button>
+            </div>
+            <div class="ac-contrast-result" id="acResult" role="status" aria-live="polite" aria-atomic="true">
+              <span class="ac-ratio" id="acRatio">—</span>
+              <span class="ac-label" data-i18n="c01.ratioLabel">ratio de contraste</span>
+              <div class="ac-badges" id="acBadges"></div>
+            </div>
+          </div>
+          <p class="ac-tip" data-i18n="c01.tip">Tip: el gris claro sobre blanco es la falla más común. Si dudás, oscurecé el texto.</p>
+        </div>
+      </section>
+
+      <!-- 02 HIT TARGETS -->
+      <section class="ac-station" id="ac-targets" aria-labelledby="ac-targets-title">
+        <header class="ac-station-header">
+          <span class="ac-station-num" data-i18n="c02.num">02</span>
+          <h2 class="ac-station-title" id="ac-targets-title" data-i18n="c02.title">Áreas táctiles</h2>
+        </header>
+        <p class="ac-station-desc" data-i18n="c02.desc">WCAG 2.5.5 (AAA) requiere que los elementos interactivos sean de al menos 44×44 px. WCAG 2.5.8 (AA, versión 2.2) pide 24px. Objetivos pequeños causan errores, especialmente en dispositivos táctiles o con temblor.</p>
+        <div class="ac-card">
+          <div class="ac-targets-controls">
+            <div class="ac-field">
+              <label class="ac-label" for="acTargetSize" data-i18n="c02.sliderLabel">Tamaño del objetivo</label>
+              <div class="ac-slider-wrap">
+                <input type="range" id="acTargetSize" min="12" max="72" value="32"
+                  aria-valuemin="12" aria-valuemax="72" aria-valuenow="32" aria-valuetext="32 píxeles" />
+                <span class="ac-slider-val" id="acTargetSizeVal">32px</span>
+              </div>
+            </div>
+            <p class="ac-hint" data-i18n="c02.hint">Verde = cumple WCAG (≥44px) · Rojo = no cumple. Probá con el tamaño más chico.</p>
+            <button class="ac-btn" id="acTargetReset" data-i18n="c02.reset">Reiniciar</button>
+          </div>
+          <div class="ac-target-stats" aria-live="polite" aria-atomic="true">
+            <div class="ac-tstat">
+              <span id="acHits">0</span>
+              <span class="ac-label" data-i18n="c02.hitsLabel">Aciertos</span>
+            </div>
+            <div class="ac-tstat">
+              <span id="acAttempts">0</span>
+              <span class="ac-label" data-i18n="c02.attemptsLabel">Intentos</span>
+            </div>
+            <div class="ac-tstat">
+              <span id="acAccuracy">—</span>
+              <span class="ac-label" data-i18n="c02.accuracyLabel">Precisión</span>
+            </div>
+          </div>
+          <div class="ac-target-area" id="acTargetArea"
+            role="application"
+            aria-label="Área de juego — haz clic en el punto para acertar, fuera para errar"
+            data-i18n-label="c02.areaAriaLabel"
+            aria-describedby="ac-targets-title">
+            <button class="ac-target-dot" id="acTargetDot"
+              style="left:50%;top:50%"
+              aria-label="Objetivo: toca aquí para anotar un punto"
+              data-i18n-label="c02.dotAriaLabel"></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 TYPOGRAPHY -->
+      <section class="ac-station" id="ac-type" aria-labelledby="ac-type-title">
+        <header class="ac-station-header">
+          <span class="ac-station-num" data-i18n="c03.num">03</span>
+          <h2 class="ac-station-title" id="ac-type-title" data-i18n="c03.title">Tipografía legible</h2>
+        </header>
+        <p class="ac-station-desc" data-i18n="c03.desc">WCAG 1.4.4 requiere que el texto pueda escalarse al 200% sin pérdida de contenido. WCAG 1.4.8 establece guías de interlineado, ancho de columna y espaciado. Una tipografía accesible mejora la lectura para todos.</p>
+        <div class="ac-card">
+          <div class="ac-type-layout">
+            <div class="ac-type-controls">
+              <div class="ac-field">
+                <label class="ac-label" for="acFontSize">
+                  <span data-i18n="c03.fsLabel">Tamaño de cuerpo</span>
+                  <span id="acFsVal">16px</span>
+                </label>
+                <div class="ac-slider-wrap">
+                  <input type="range" id="acFontSize" min="11" max="28" value="16"
+                    aria-valuemin="11" aria-valuemax="28" aria-valuenow="16" aria-valuetext="16 píxeles" />
+                  <span class="ac-pill" id="acFsPill">OK</span>
+                </div>
+              </div>
+              <div class="ac-field">
+                <label class="ac-label" for="acLineHeight">
+                  <span data-i18n="c03.lhLabel">Interlineado</span>
+                  <span id="acLhVal">1.5</span>
+                </label>
+                <div class="ac-slider-wrap">
+                  <input type="range" id="acLineHeight" min="10" max="20" value="15" step="1"
+                    aria-valuemin="1.0" aria-valuemax="2.0" aria-valuenow="1.5" aria-valuetext="1.5" />
+                  <span class="ac-pill" id="acLhPill">OK</span>
+                </div>
+              </div>
+              <div class="ac-field">
+                <label class="ac-label" for="acColWidth">
+                  <span data-i18n="c03.cwLabel">Ancho de columna</span>
+                  <span id="acCwVal">65ch</span>
+                </label>
+                <div class="ac-slider-wrap">
+                  <input type="range" id="acColWidth" min="30" max="100" value="65"
+                    aria-valuemin="30" aria-valuemax="100" aria-valuenow="65" aria-valuetext="65 caracteres" />
+                  <span class="ac-pill" id="acCwPill">OK</span>
+                </div>
+              </div>
+              <div class="ac-field">
+                <label class="ac-label" for="acLetterSpacing">
+                  <span data-i18n="c03.lsLabel">Espaciado de letras</span>
+                  <span id="acLsVal">0em</span>
+                </label>
+                <div class="ac-slider-wrap">
+                  <input type="range" id="acLetterSpacing" min="-4" max="12" value="0"
+                    aria-valuemin="-0.04" aria-valuemax="0.12" aria-valuenow="0" aria-valuetext="0 em" />
+                </div>
+              </div>
+              <button class="ac-btn" id="acTypeReset" data-i18n="c03.reset">Restaurar valores</button>
+            </div>
+            <div class="ac-type-preview" id="acTypePreview"
+              role="region"
+              aria-label="Vista previa del texto"
+              data-i18n-label="c03.previewLabel">
+              <p id="acTypeText" data-i18n="c03.previewText">El cuerpo del texto debe ser legible en condiciones reales de uso. La tipografía accesible no es una opción estética, es un requisito funcional. Un buen tamaño, interlineado generoso y columna de ancho moderado reducen la carga cognitiva y mejoran la comprensión.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 VOICE / SCREEN READER -->
+      <section class="ac-station" id="ac-voice" aria-labelledby="ac-voice-title">
+        <header class="ac-station-header">
+          <span class="ac-station-num" data-i18n="c04.num">04</span>
+          <h2 class="ac-station-title" id="ac-voice-title" data-i18n="c04.title">Lectores de pantalla</h2>
+        </header>
+        <p class="ac-station-desc" data-i18n="c04.desc">Los lectores de pantalla anuncian elementos usando texto alternativo, labels y HTML semántico. La diferencia entre un label vago y uno descriptivo es la diferencia entre confusión y claridad.</p>
+        <div class="ac-card">
+          <div class="ac-voice-settings">
+            <div class="ac-field">
+              <label class="ac-label" for="acVoiceSelect" data-i18n="c04.voiceLabel">Voz del sistema</label>
+              <select id="acVoiceSelect" class="ac-select"></select>
+            </div>
+            <div class="ac-field">
+              <label class="ac-label" for="acVoiceRate">
+                <span data-i18n="c04.rateLabel">Velocidad de lectura</span>
+                <span id="acVoiceRateVal">1.0×</span>
+              </label>
+              <input type="range" id="acVoiceRate" min="5" max="20" value="10" step="1"
+                aria-valuemin="0.5" aria-valuemax="2.0" aria-valuenow="1.0" aria-valuetext="1.0 veces" />
+            </div>
+          </div>
+          <div class="ac-voice-cards" id="acVoiceCards">
+
+            <!-- Card 1: bad button -->
+            <div class="ac-voice-card" data-quality="bad">
+              <div class="ac-voice-card-top">
+                <span class="ac-pill ac-pill--bad" data-i18n="c04.badBtn">Malo</span>
+                <span class="ac-label" data-i18n="c04.card1title">Botón sin descripción</span>
+              </div>
+              <div class="ac-voice-card-demo">
+                <button class="ac-demo-element" aria-label="[sin etiqueta — esto demuestra el problema]">&#8594;</button>
+              </div>
+              <div class="ac-voice-card-annotation">
+                <span class="ac-label" data-i18n="c04.srReads">El lector anuncia:</span>
+                <code class="ac-code" data-i18n="c04.card1sr">botón</code>
+              </div>
+              <p class="ac-card-explain" data-i18n="c04.card1explain">Sin aria-label, el lector anuncia solo "botón". ¿Botón de qué? El usuario no puede saber.</p>
+              <button class="ac-listen-btn" id="acListen1"
+                aria-label="Escuchar: botón"
+                data-speak-es="botón"
+                data-speak-en="button">
+                <i class="ri-play-line" aria-hidden="true"></i>
+                <span class="ac-listen-label" data-i18n="c04.listenBtn">Escuchar</span>
+              </button>
+            </div>
+
+            <!-- Card 2: good button -->
+            <div class="ac-voice-card" data-quality="good">
+              <div class="ac-voice-card-top">
+                <span class="ac-pill ac-pill--good" data-i18n="c04.goodBtn">Bueno</span>
+                <span class="ac-label" data-i18n="c04.card2title">Botón con aria-label</span>
+              </div>
+              <div class="ac-voice-card-demo">
+                <button class="ac-demo-element" aria-label="Ir al carrito de compras, 3 artículos">&#8594;</button>
+              </div>
+              <div class="ac-voice-card-annotation">
+                <span class="ac-label" data-i18n="c04.srReads">El lector anuncia:</span>
+                <code class="ac-code" data-i18n="c04.card2sr">Ir al carrito de compras, 3 artículos</code>
+              </div>
+              <p class="ac-card-explain" data-i18n="c04.card2explain">aria-label describe la acción específica. El usuario entiende el propósito sin ver la pantalla.</p>
+              <button class="ac-listen-btn" id="acListen2"
+                aria-label="Escuchar: Ir al carrito de compras, 3 artículos"
+                data-speak-es="Ir al carrito de compras, 3 artículos"
+                data-speak-en="Go to shopping cart, 3 items">
+                <i class="ri-play-line" aria-hidden="true"></i>
+                <span class="ac-listen-label" data-i18n="c04.listenBtn">Escuchar</span>
+              </button>
+            </div>
+
+            <!-- Card 3: bad image -->
+            <div class="ac-voice-card" data-quality="bad">
+              <div class="ac-voice-card-top">
+                <span class="ac-pill ac-pill--bad" data-i18n="c04.badBtn">Malo</span>
+                <span class="ac-label" data-i18n="c04.card3title">Imagen sin alt</span>
+              </div>
+              <div class="ac-voice-card-demo">
+                <div class="ac-demo-img-placeholder" role="img" aria-label="imagen sin descripción">IMG</div>
+              </div>
+              <div class="ac-voice-card-annotation">
+                <span class="ac-label" data-i18n="c04.srReads">El lector anuncia:</span>
+                <code class="ac-code" data-i18n="c04.card3sr">imagen sin descripción</code>
+              </div>
+              <p class="ac-card-explain" data-i18n="c04.card3explain">Sin atributo alt, el lector omite la imagen o lee el nombre del archivo. Información perdida.</p>
+              <button class="ac-listen-btn" id="acListen3"
+                aria-label="Escuchar: imagen sin descripción"
+                data-speak-es="imagen sin descripción"
+                data-speak-en="image without description">
+                <i class="ri-play-line" aria-hidden="true"></i>
+                <span class="ac-listen-label" data-i18n="c04.listenBtn">Escuchar</span>
+              </button>
+            </div>
+
+            <!-- Card 4: good image -->
+            <div class="ac-voice-card" data-quality="good">
+              <div class="ac-voice-card-top">
+                <span class="ac-pill ac-pill--good" data-i18n="c04.goodBtn">Bueno</span>
+                <span class="ac-label" data-i18n="c04.card4title">Imagen con alt descriptivo</span>
+              </div>
+              <div class="ac-voice-card-demo">
+                <div class="ac-demo-img-placeholder" role="img" aria-label="Fotografía de un escritorio minimalista con laptop, libreta y café">IMG</div>
+              </div>
+              <div class="ac-voice-card-annotation">
+                <span class="ac-label" data-i18n="c04.srReads">El lector anuncia:</span>
+                <code class="ac-code" data-i18n="c04.card4sr">Fotografía de un escritorio minimalista con laptop, libreta y café</code>
+              </div>
+              <p class="ac-card-explain" data-i18n="c04.card4explain">alt describe el contenido, no "imagen de" (eso es redundante). Incluir la información que aporta la imagen.</p>
+              <button class="ac-listen-btn" id="acListen4"
+                aria-label="Escuchar: Fotografía de un escritorio minimalista con laptop, libreta y café"
+                data-speak-es="Fotografía de un escritorio minimalista con laptop, libreta y café"
+                data-speak-en="Photograph of a minimalist desk with laptop, notebook and coffee">
+                <i class="ri-play-line" aria-hidden="true"></i>
+                <span class="ac-listen-label" data-i18n="c04.listenBtn">Escuchar</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- 05 KEYBOARD / FOCUS -->
+      <section class="ac-station" id="ac-keyboard" aria-labelledby="ac-keyboard-title">
+        <header class="ac-station-header">
+          <span class="ac-station-num" data-i18n="c05.num">05</span>
+          <h2 class="ac-station-title" id="ac-keyboard-title" data-i18n="c05.title">Navegación por teclado</h2>
+        </header>
+        <p class="ac-station-desc" data-i18n="c05.desc">Todos los elementos interactivos deben ser accesibles con teclado. WCAG 2.4.7 requiere un indicador de foco visible. Remover el outline sin reemplazarlo rompe la navegación para usuarios de teclado y tecnologías asistivas.</p>
+        <div class="ac-card">
+          <div class="ac-keyboard-top">
+            <label class="ac-label" for="acFocusToggle" data-i18n="c05.toggleLabel">Focus visible</label>
+            <button class="ac-toggle" id="acFocusToggle" role="switch" aria-pressed="true">
+              <span class="ac-toggle-track"><span class="ac-toggle-thumb"></span></span>
+              <span class="ac-toggle-label" id="acFocusLabel" data-i18n="c05.on">ON</span>
+            </button>
+          </div>
+          <p class="ac-hint" id="acKeyboardHint" data-i18n="c05.hint">Usá Tab para avanzar · Shift+Tab para retroceder · Enter/Espacio para activar. Desactivá el focus para ver el impacto.</p>
+          <form class="ac-focus-form" id="acFocusForm" onsubmit="return false;" aria-describedby="acKeyboardHint">
+            <div class="ac-form-field">
+              <label class="ac-form-label" for="acFormName" data-i18n="c05.formName">Nombre</label>
+              <input class="ac-form-input" type="text" id="acFormName" autocomplete="off" />
+            </div>
+            <div class="ac-form-field">
+              <label class="ac-form-label" for="acFormEmail" data-i18n="c05.formEmail">Email</label>
+              <input class="ac-form-input" type="email" id="acFormEmail" autocomplete="off" />
+            </div>
+            <fieldset class="ac-form-fieldset">
+              <legend class="ac-form-label" data-i18n="c05.formPref">Preferencia de contacto</legend>
+              <label class="ac-form-radio-label"><input type="radio" name="acPref" value="email" class="ac-form-radio" /><span data-i18n="c05.formOpt1">Email</span></label>
+              <label class="ac-form-radio-label"><input type="radio" name="acPref" value="phone" class="ac-form-radio" /><span data-i18n="c05.formOpt2">Teléfono</span></label>
+              <label class="ac-form-radio-label"><input type="radio" name="acPref" value="whatsapp" class="ac-form-radio" /><span data-i18n="c05.formOpt3">WhatsApp</span></label>
+            </fieldset>
+            <label class="ac-form-check-label">
+              <input type="checkbox" class="ac-form-check" id="acFormCheck" />
+              <span data-i18n="c05.formCheck">Acepto recibir novedades</span>
+            </label>
+            <div class="ac-form-btns">
+              <button type="submit" class="ac-btn ac-btn--primary" data-i18n="c05.formSubmit">Enviar</button>
+              <button type="reset" class="ac-btn" data-i18n="c05.formCancel">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 06 ALT TEXT -->
+      <section class="ac-station" id="ac-alt" aria-labelledby="ac-alt-title">
+        <header class="ac-station-header">
+          <span class="ac-station-num" data-i18n="c06.num">06</span>
+          <h2 class="ac-station-title" id="ac-alt-title" data-i18n="c06.title">Texto alternativo</h2>
+        </header>
+        <p class="ac-station-desc" data-i18n="c06.desc">El atributo alt describe el contenido o función de una imagen para usuarios que no pueden verla. Buenas reglas: imágenes informativas describen su contenido; imágenes decorativas usan alt vacío; imágenes funcionales describen su acción.</p>
+        <div class="ac-card">
+          <div class="ac-alt-table" role="table" aria-label="Ejemplos de texto alternativo correcto e incorrecto">
+            <div class="ac-alt-table-head" role="row">
+              <span role="columnheader" data-i18n="c06.colCase">Caso</span>
+              <span role="columnheader" data-i18n="c06.colBad">Alt incorrecto</span>
+              <span role="columnheader" data-i18n="c06.colGood">Alt correcto</span>
+            </div>
+            <div class="ac-alt-row" role="row">
+              <span class="ac-alt-case" role="cell" data-i18n="c06.row1case">Foto de producto (e-commerce)</span>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--bad" data-i18n="c06.colBad">Alt incorrecto</span>
+                <code class="ac-code" data-i18n="c06.row1bad">alt="imagen"</code>
+              </div>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--good" data-i18n="c06.colGood">Alt correcto</span>
+                <code class="ac-code" data-i18n="c06.row1good">alt="Zapatilla running blanca, suela azul, talle 42"</code>
+              </div>
+            </div>
+            <div class="ac-alt-row" role="row">
+              <span class="ac-alt-case" role="cell" data-i18n="c06.row2case">Logo (enlace al inicio)</span>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--bad" data-i18n="c06.colBad">Alt incorrecto</span>
+                <code class="ac-code" data-i18n="c06.row2bad">alt="logo.png"</code>
+              </div>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--good" data-i18n="c06.colGood">Alt correcto</span>
+                <code class="ac-code" data-i18n="c06.row2good">alt="1778 Studio — volver al inicio"</code>
+              </div>
+            </div>
+            <div class="ac-alt-row" role="row">
+              <span class="ac-alt-case" role="cell" data-i18n="c06.row3case">Imagen decorativa</span>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--bad" data-i18n="c06.colBad">Alt incorrecto</span>
+                <code class="ac-code" data-i18n="c06.row3bad">alt="separador decorativo con líneas"</code>
+              </div>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--good" data-i18n="c06.colGood">Alt correcto</span>
+                <code class="ac-code" data-i18n="c06.row3good">alt="" (vacío — el lector la omite)</code>
+              </div>
+            </div>
+            <div class="ac-alt-row" role="row">
+              <span class="ac-alt-case" role="cell" data-i18n="c06.row4case">Gráfico de datos</span>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--bad" data-i18n="c06.colBad">Alt incorrecto</span>
+                <code class="ac-code" data-i18n="c06.row4bad">alt="gráfico"</code>
+              </div>
+              <div class="ac-alt-cell" role="cell">
+                <span class="ac-pill ac-pill--good" data-i18n="c06.colGood">Alt correcto</span>
+                <code class="ac-code" data-i18n="c06.row4good">alt="Gráfico de barras: ventas crecieron 40% en Q4 2024 vs Q4 2023"</code>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 07 MOTION -->
+      <section class="ac-station" id="ac-motion" aria-labelledby="ac-motion-title">
+        <header class="ac-station-header">
+          <span class="ac-station-num" data-i18n="c07.num">07</span>
+          <h2 class="ac-station-title" id="ac-motion-title" data-i18n="c07.title">Movimiento reducido</h2>
+        </header>
+        <p class="ac-station-desc" data-i18n="c07.desc">El movimiento excesivo puede causar náuseas o convulsiones en personas con trastornos vestibulares, migraña, epilepsia fotosensible o autismo. WCAG 2.3.3 (AAA) requiere una forma de detener animaciones no esenciales.</p>
+        <div class="ac-card">
+          <div class="ac-motion-top">
+            <div class="ac-toggle-wrap">
+              <span class="ac-label" data-i18n="c07.toggleLabel">Reducir movimiento</span>
+              <button class="ac-toggle" id="acMotionToggle" role="switch" aria-pressed="false">
+                <span class="ac-toggle-track"><span class="ac-toggle-thumb"></span></span>
+                <span class="ac-toggle-label" id="acMotionLabel" data-i18n="c05.off">OFF</span>
+              </button>
+            </div>
+            <div class="ac-motion-system" id="acMotionSystem" aria-live="polite">
+              <span data-i18n="c07.systemLabel">Detección del sistema</span>:
+              <span id="acMotionSystemVal" data-i18n="c07.systemNormal">Preferencia del sistema: normal</span>
+            </div>
+          </div>
+          <div class="ac-motion-stage" id="acMotionStage" aria-hidden="true">
+            <div class="ac-shape ac-shape--circle" aria-hidden="true"></div>
+            <div class="ac-shape ac-shape--square" aria-hidden="true"></div>
+            <div class="ac-shape ac-shape--triangle" aria-hidden="true"></div>
+            <div class="ac-shape ac-shape--ring" aria-hidden="true"></div>
+            <div class="ac-shape ac-shape--dot" aria-hidden="true"></div>
+          </div>
+          <div class="ac-code-block">
+            <span class="ac-label" data-i18n="c07.codeLabel">Media query CSS:</span>
+            <pre class="ac-pre"><code>@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="ac-footer">
+        <p class="ac-footer-text" data-i18n="footer.quote">La accesibilidad no es una función — es el fundamento del buen diseño.</p>
+        <div class="ac-footer-links">
+          <a href="https://www.w3.org/WAI/WCAG21/quickref/" target="_blank" class="ac-link" rel="noopener">WCAG 2.1 Quick Ref</a>
+          <a href="https://webaim.org/resources/contrastchecker/" target="_blank" class="ac-link" rel="noopener">WebAIM Contrast</a>
+          <a href="https://www.a11yproject.com/" target="_blank" class="ac-link" rel="noopener">The A11Y Project</a>
+        </div>
+      </footer>
+
+    </div><!-- /ac-scroll -->
+  </section>
 
   <script type="module" src="/js/main.js"></script>
 </body>

@@ -131,11 +131,6 @@ html, body {
   gap: 2px;
 }
 .panel-exp-item:last-child { border-bottom: none; }
-.panel-exp-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 .panel-exp-role {
   font-size: 13px;
   font-weight: 600;
@@ -466,6 +461,34 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
 .char-inner { display: inline-block; }
 
 
+/* ─── HERO PARAGRAPH (scroll-typed) ─────────────────────────────────────────── */
+.hero-para-wrap {
+  min-height: 3.4em;      /* 2 lines at 1.6 line-height */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+}
+.hero-para {
+  font-size: clamp(13px, 1.35vw, 19px);
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--muted);
+  max-width: min(720px, 88vw);
+  text-align: center;
+  transition: color var(--t);
+}
+/* Split-text clip per character */
+.para-char {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  line-height: 1.1em;
+}
+.para-char-inner {
+  display: inline-block;
+}
+
 /* ─── HERO BUTTONS ──────────────────────────────────────────────────────────── */
 .hero-btns {
   display: flex;
@@ -571,8 +594,6 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
   transition: color var(--t);
 }
 /* Card fills */
-.c1 { background: radial-gradient(circle at 25% 75%, #252525 0%, #111 100%); }
-.c2 { background: radial-gradient(circle at 75% 25%, #221e1b 0%, #130f0d 100%); }
 .c3 { background: radial-gradient(circle at 35% 65%, #15151f 0%, #0d0d14 100%); }
 .c4 { background: radial-gradient(circle at 65% 35%, #1e1918 0%, #100d0c 100%); }
 .c5 { background: radial-gradient(circle at 50% 50%, #1a1e18 0%, #0f1210 100%); }

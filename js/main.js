@@ -108,6 +108,12 @@ const heroMsgEl    = document.getElementById('heroMessage');
 const heroTaglineEl= document.getElementById('heroTagline');
 const labSectionEl  = document.getElementById('labSection');
 const darkOverlayEl = document.getElementById('darkOverlay');
+const heroParaWrapEl = document.getElementById('heroParaWrap');
+const heroParaEl     = document.getElementById('heroPara');
+
+const PARA_TEXT =
+  "UX Designer discovering the world of development. Design experiments using Figma, AI and Adobe CC.\n" +
+  "Visit my Twitter to learn more about the project.";
 
 let isDark      = false;
 let isPanelOpen = false;
@@ -263,7 +269,39 @@ function splitAndAnimateHeadline() {
   liquidReveal(el, headlineDelay);
 
   // 4. Buttons after liquid settles
+
   gsap.from('#heroBtns', { opacity: 0, y: 18, duration: 0.8, ease: 'power3.out', delay: headlineDelay + 1.6 });
+
+  // Para split-text — starts right after headline solidifies
+  heroParaEl.innerHTML = '';
+  setTimeout(() => {
+    let i = 0;
+    const iv = setInterval(() => {
+      if (i < PARA_TEXT.length) { _addParaChar(PARA_TEXT[i]); i++; }
+      else clearInterval(iv);
+    }, 22);
+  }, (headlineDelay + 0.5) * 1000);
+}
+
+// ── Split-text: each char slides up from clip ────────────────────────────────
+function _addParaChar(ch) {
+  if (ch === '\n') {
+    _paraBreakPos = heroParaEl.childNodes.length;
+    heroParaEl.appendChild(document.createElement('br'));
+    return;
+  }
+  if (ch === ' ') {
+    heroParaEl.appendChild(document.createTextNode('\u00A0'));
+    return;
+  }
+  const clip  = document.createElement('span');
+  const inner = document.createElement('span');
+  clip.className  = 'para-char';
+  inner.className = 'para-char-inner';
+  inner.textContent = ch;
+  clip.appendChild(inner);
+  heroParaEl.appendChild(clip);
+  gsap.fromTo(inner, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.45, ease: 'power3.out' });
 }
 
 // ─── LIQUID REVEAL ───────────────────────────────────────────────────────────
@@ -408,17 +446,22 @@ function updateLab(lp) {
 }
 
 function updateHeadline(progress) {
-  const wt     = smoothstep(Math.min(1, progress / 0.55));
-  const weight = Math.round(lerp(900, 100, wt));
-  const ot     = smoothstep(Math.max(0, Math.min(1, (progress - 0.35) / 0.35)));
+  const wt      = smoothstep(Math.min(1, progress / 0.55));
+  const weight  = Math.round(lerp(900, 100, wt));
+  const ot      = smoothstep(Math.max(0, Math.min(1, (progress - 0.35) / 0.35)));
   const opacity = 1 - ot;
 
-  headlineEl.style.fontWeight = weight;
-  headlineEl.style.opacity    = opacity;
-  heroMsgEl.style.opacity     = opacity;
+  headlineEl.style.fontWeight  = weight;
+  headlineEl.style.opacity     = opacity;
+  heroMsgEl.style.opacity      = opacity;
+  if (heroParaWrapEl) heroParaWrapEl.style.opacity = opacity;
+
   const btnOt = smoothstep(Math.max(0, Math.min(1, (progress - 0.25) / 0.30)));
   heroBtnsEl.style.opacity = 1 - btnOt;
+
 }
+
+// Para typing uses span-per-word system — scroll accel handled inside the timer
 
 function updateCards() {
   const progress    = Math.max(0, Math.min(1, scrollY / THRESHOLD()));
@@ -490,7 +533,6 @@ function setupMagnetic() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MATIMENU
 // ═══════════════════════════════════════════════════════════════════════════════
-const PANEL_W = 540;
 
 function openPanel() {
   isPanelOpen = true;

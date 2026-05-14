@@ -574,11 +574,13 @@ function tick(time) {
 // ─── ACCESSIBILITY SECTION ───────────────────────────────────────────────────
 function openAccessSection() {
   accessSectionEl.style.pointerEvents = 'auto';
+  document.body.classList.add('access-open');
   gsap.to(accessSectionEl, { xPercent: 0, opacity: 1, duration: 0.75, ease: 'expo.out' });
 }
 
 function closeAccessSection() {
   accessSectionEl.style.pointerEvents = 'none';
+  document.body.classList.remove('access-open');
   gsap.to(accessSectionEl, { xPercent: 100, opacity: 0, duration: 0.6, ease: 'expo.inOut' });
 }
 

@@ -218,6 +218,9 @@ html, body {
 }
 
 /* ─── CUSTOM CURSOR ─────────────────────────────────────────────────────────── */
+body.access-open { cursor: auto; }
+body.access-open .cursor { display: none; }
+
 .cursor {
   position: fixed;
   top: 0; left: 0;
@@ -548,7 +551,10 @@ html.dark .navbar.on-dark .switch-track::after { background: #111111; }
   opacity: 1;
 }
 .hero-btn--primary:hover {
-  opacity: 0.85;
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--text);
+  opacity: 1;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -701,8 +707,9 @@ html.dark .navbar.on-dark .switch-track::after { background: #111111; }
   white-space: nowrap;
 }
 .lab-chip:hover {
-  color: rgba(244,243,238,0.85);
-  border-color: rgba(244,243,238,0.45);
+  background: #F4F3EE;
+  border-color: #F4F3EE;
+  color: #111111;
 }
 .lab-chip.active {
   background: #F4F3EE;

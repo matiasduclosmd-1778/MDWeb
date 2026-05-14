@@ -88,7 +88,14 @@ let scrollY    = 0;
 const lerp        = (a, b, t) => a + (b - a) * t;
 const smoothstep  = t => t * t * (3 - 2 * t);
 const easeOutQuad = t => 1 - (1 - t) * (1 - t);
-const HW = 120;
+
+// Responsive helpers
+const isTouch   = () => window.matchMedia('(hover: none), (pointer: coarse)').matches;
+const isMobile  = () => window.innerWidth < 768;
+let HW = 120; // half card width — updated on resize
+
+function getHW()     { return isMobile() ? 80 : 120; }
+function getPanelW() { return isMobile() ? window.innerWidth : Math.min(540, window.innerWidth); }
 
 // DOM refs — must live here so tick() can access them from line 1
 const cursorEl     = document.getElementById('cursor');
@@ -121,6 +128,8 @@ document.fonts.ready.then(() => {
   splitAndAnimateHeadline();
   setupDarkMode();
   setupClock();
+  setupSectionNav();
+  setupLabChips();
 });
 
 // ─── THREE.JS BACKGROUND ────────────────────────────────────────────────────
@@ -159,6 +168,7 @@ function setupThree() {
   window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     buildScatter();
+    buildFanPos();
   });
 
   threeState = { renderer, scene, camera, uniforms, clock: new THREE.Clock() };
@@ -170,12 +180,16 @@ function setupLenis() {
     duration: 1.4,
     easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     smoothWheel: true,
+    smoothTouch: false,   // native momentum on touch devices
+    touchMultiplier: 1.5,
   });
   // scroll value is read directly in tick() — no event needed
 }
 
 // ─── CUSTOM CURSOR ───────────────────────────────────────────────────────────
 function setupCursor() {
+  if (isTouch()) return; // touch devices use native cursor
+
   const faceEl = document.getElementById('cursorFace');
 
   document.addEventListener('mousemove', e => {
@@ -291,14 +305,19 @@ function liquidReveal(el, delaySeconds) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKS
 // ═══════════════════════════════════════════════════════════════════════════════
-// Phase 1 target: tight fan rising from centre
-const fanPos = [
-  { x: -155, y: -15, rot: -12 },
-  { x:  -60, y:  12, rot:  -5 },
-  { x:   28, y:   0, rot:   2 },
-  { x:  118, y:  10, rot:   8 },
-  { x:  208, y: -12, rot:  14 },
-];
+// Phase 1 target: tight fan — rebuilt on resize
+let fanPos = [];
+function buildFanPos() {
+  const s = isMobile() ? 0.55 : 1.0;
+  fanPos = [
+    { x: -155 * s, y: -15, rot: -12 },
+    { x:  -60 * s, y:  12, rot:  -5 },
+    { x:   28 * s, y:   0, rot:   2 },
+    { x:  118 * s, y:  10, rot:   8 },
+    { x:  208 * s, y: -12, rot:  14 },
+  ];
+  HW = getHW();
+}
 
 // Phase 2 target: scattered full-screen (built from vw/vh)
 let scatterPos = [];
@@ -313,6 +332,7 @@ function buildScatter() {
   ];
 }
 buildScatter();
+buildFanPos();
 
 const cardEls = ['pc0','pc1','pc2','pc3','pc4'].map(id => document.getElementById(id));
 
@@ -363,6 +383,9 @@ const LAB_DURATION  = () => window.innerHeight * 0.8;
 const getLabProgress = () =>
   Math.max(0, Math.min(1, (scrollY - THRESHOLD()) / LAB_DURATION()));
 
+const navbarEl    = document.querySelector('.navbar');
+const sectionNavEl = document.getElementById('sectionNav');
+
 function updateLab(lp) {
   const t = smoothstep(lp);
 
@@ -374,9 +397,14 @@ function updateLab(lp) {
   // 2. Full-page dark overlay
   darkOverlayEl.style.opacity = lerp(0, 0.94, t);
 
-  // 3. LAB section — starts fading in at 20% progress
-  labSectionEl.style.opacity   = smoothstep(Math.max(0, (lp - 0.2) / 0.8));
-  labSectionEl.style.transform = `translateY(${lerp(50, 0, easeOutQuad(lp))}px)`;
+  // 3. Nav + section indicator invert when background is dark enough
+  navbarEl.classList.toggle('on-dark', lp > 0.45);
+  sectionNavEl.classList.toggle('on-dark', lp > 0.45);
+
+  // 4. LAB section — starts fading in at 20% progress
+  labSectionEl.style.opacity      = smoothstep(Math.max(0, (lp - 0.2) / 0.8));
+  labSectionEl.style.transform    = `translateY(${lerp(50, 0, easeOutQuad(lp))}px)`;
+  labSectionEl.style.pointerEvents = lp >= 0.95 ? 'auto' : 'none';
 }
 
 function updateHeadline(progress) {
@@ -398,6 +426,7 @@ function updateCards() {
 
   updateHeadline(progress);
   updateLab(labProgress);
+  updateSectionNavActive(progress, labProgress);
 
   const P1 = 0.42;
 
@@ -439,6 +468,7 @@ function updateCards() {
 
 // ─── MAGNETIC EFFECT ─────────────────────────────────────────────────────────
 function setupMagnetic() {
+  if (isTouch()) return; // no magnetic on touch
   document.querySelectorAll('[data-magnetic]').forEach(el => {
     el.addEventListener('mousemove', e => {
       const r  = el.getBoundingClientRect();
@@ -466,8 +496,9 @@ function openPanel() {
   isPanelOpen = true;
 
   // Panel + stage slide together — expo.out: arranca rápido, frena suave
-  gsap.to(matiMenuEl, { x: 0,       duration: 0.72, ease: 'expo.out' });
-  gsap.to(stageEl,     { x: PANEL_W, duration: 0.72, ease: 'expo.out' });
+  const pw = getPanelW();
+  gsap.to(matiMenuEl, { x: 0,  duration: 0.72, ease: 'expo.out' });
+  gsap.to(stageEl,    { x: pw, duration: 0.72, ease: 'expo.out' });
 
   // Contenido entra junto con el panel, sin delays grandes
   gsap.from('.panel-name span', { x: -16, opacity: 0, duration: 0.55, stagger: 0.06, delay: 0.05, ease: 'power3.out' });
@@ -575,3 +606,58 @@ function tick(time) {
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAB CHIPS
+// ═══════════════════════════════════════════════════════════════════════════════
+function setupLabChips() {
+  const chips   = document.querySelectorAll('.lab-chip');
+  const content = document.getElementById('labContent');
+
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const isActive = chip.classList.contains('active');
+
+      // Deactivate all chips + hide all panels
+      chips.forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.lab-panel').forEach(p => p.classList.remove('visible'));
+
+      if (isActive) {
+        // Toggle off — collapse
+        gsap.to(content, { height: 0, duration: 0.35, ease: 'power3.inOut' });
+      } else {
+        // Activate chip + show panel
+        chip.classList.add('active');
+        const panel = document.querySelector(`.lab-panel[data-panel="${chip.dataset.lab}"]`);
+        if (panel) {
+          panel.classList.add('visible');
+          gsap.to(content, { height: 120, duration: 0.45, ease: 'power3.out' });
+        }
+      }
+    });
+  });
+}
+
+// ─── SECTION NAV ─────────────────────────────────────────────────────────────
+function setupSectionNav() {
+  document.querySelectorAll('.section-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const section = btn.dataset.section;
+      let target = 0;
+      if (section === 'works') target = THRESHOLD() * 0.55;
+      if (section === 'lab')   target = THRESHOLD() + LAB_DURATION() * 0.65;
+      lenis.scrollTo(target, { duration: 1.6, easing: t => 1 - Math.pow(1 - t, 4) });
+    });
+  });
+}
+
+function updateSectionNavActive(progress, labProgress) {
+  if (!sectionNavEl) return;
+  const items = sectionNavEl.querySelectorAll('.section-nav-item');
+  let active = 'home';
+  if (labProgress >= 0.3)      active = 'lab';
+  else if (progress >= 0.12)   active = 'works';
+  items.forEach(item => {
+    item.classList.toggle('active', item.dataset.section === active);
+  });
+}

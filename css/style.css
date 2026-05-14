@@ -298,6 +298,75 @@ html.dark .cursor-face      { mix-blend-mode: screen; filter: invert(1); }
 html.dark .nav-dot              { background: var(--text); transform: scale(1.3); }
 html.dark .nav-btn:hover .nav-dot { background: var(--text); }
 
+/* ─── SECTION NAV (right side indicator) ────────────────────────────────────── */
+.section-nav {
+  position: fixed;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.section-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 3px 0;
+  transition: color var(--t);
+}
+
+.section-nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s;
+  opacity: 0.4;
+}
+
+.section-nav-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.section-nav-item:hover .section-nav-label { opacity: 0.6; transform: translateX(0); }
+.section-nav-item:hover .section-nav-dot   { opacity: 0.7; }
+
+.section-nav-item.active .section-nav-label { opacity: 1; transform: translateX(0); }
+.section-nav-item.active .section-nav-dot   {
+  background: currentColor;
+  opacity: 1;
+  transform: scale(1.4);
+}
+
+/* Nav + section-nav on dark background (LAB section) */
+.navbar.on-dark .nav-brand,
+.navbar.on-dark .nav-btn,
+.section-nav.on-dark .section-nav-item { color: #F4F3EE; }
+
+.navbar.on-dark .nav-brand:hover,
+.navbar.on-dark .nav-btn:hover { background: #F4F3EE; color: #0d0d0d; }
+
+.navbar.on-dark .nav-dot { background: rgba(244,243,238,0.45); }
+.navbar.on-dark .nav-btn:hover .nav-dot { background: #0d0d0d; }
+
+.navbar.on-dark .nav-logo { filter: invert(1); }
+.navbar.on-dark .nav-brand:hover .nav-logo { filter: invert(0); }
+
 /* ─── FOOTER ────────────────────────────────────────────────────────────────── */
 .site-footer {
   position: fixed;
@@ -553,4 +622,149 @@ html.dark .nav-btn:hover .nav-dot { background: var(--text); }
   text-transform: uppercase;
   color: #F4F3EE;
   text-align: center;
+}
+
+.lab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.lab-chip {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(244,243,238,0.5);
+  background: transparent;
+  border: 1px solid rgba(244,243,238,0.2);
+  border-radius: 100px;
+  padding: 9px 20px;
+  cursor: none;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.lab-chip:hover {
+  color: rgba(244,243,238,0.85);
+  border-color: rgba(244,243,238,0.45);
+}
+.lab-chip.active {
+  background: #F4F3EE;
+  border-color: #F4F3EE;
+  color: #0e0e0e;
+}
+
+.lab-content {
+  width: min(720px, 90vw);
+  height: 0;
+  overflow: hidden;
+}
+
+.lab-panel {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+.lab-panel.visible { display: flex; }
+
+.lab-coming {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(244,243,238,0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   TOUCH DEVICES — disable custom cursor
+════════════════════════════════════════════════════════════════════════════════ */
+@media (hover: none), (pointer: coarse) {
+  html, body  { cursor: auto !important; }
+  .cursor     { display: none !important; }
+  /* restore interactive cursor for touch */
+  a, button, [data-magnetic], input, .project-card, .lab-chip { cursor: pointer; }
+  /* hover states never get stuck on touch */
+  .panel-tag:hover,
+  .panel-social-link:hover,
+  .lab-chip:hover,
+  .nav-brand:hover,
+  .nav-btn:hover { background: transparent; color: inherit; border-color: inherit; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MOBILE  (≤ 767px)
+════════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  /* Body scroll room — less needed on mobile */
+  html, body { height: 380vh; }
+
+  /* ── Nav ── */
+  .navbar { padding: 14px 16px; gap: 0; }
+  .nav-brand, .nav-btn { padding: 6px 10px; font-size: 10px; gap: 6px; }
+  /* hide "Dark Mode" label on mobile, keep dot */
+  #darkToggle span:last-child { display: none; }
+
+  /* ── Section nav — too small on mobile ── */
+  .section-nav { display: none; }
+
+  /* ── Footer ── */
+  .site-footer { padding: 12px 16px; }
+  .footer-text { font-size: 9px; letter-spacing: 0.06em; }
+
+  /* ── Hero ── */
+  .hero { gap: 24px; }
+  .hero-message { gap: 10px; }
+  .hero-avatar  { width: 28px; height: 28px; font-size: 9px; }
+  .hero-tagline { font-size: 11px; }
+  .headline     { font-size: clamp(42px, 13vw, 72px); }
+
+  .hero-btns {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: min(280px, 80vw);
+  }
+  .hero-btn {
+    font-size: 10px;
+    padding: 10px 18px;
+    text-align: center;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* ── MatiMenu — full width ── */
+  #matiMenu {
+    width: 100vw;
+    padding: 20px 20px 28px;
+    gap: 12px;
+  }
+  .panel-name span { font-size: clamp(28px, 8vw, 40px); }
+  .panel-exp-role  { font-size: 12px; }
+  .panel-exp-company { font-size: 11px; }
+  .panel-social-link { font-size: 11px; }
+
+  /* ── Works cards — scaled down ── */
+  .card-thumb  { width: 160px; height: 120px; border-radius: 10px; }
+  .project-card { width: 160px; }
+  .card-label  { font-size: 9px; }
+
+  /* ── LAB ── */
+  .lab-section { gap: 14px; }
+  .lab-title   { font-size: clamp(38px, 11vw, 72px); }
+  .lab-chips   { gap: 7px; padding: 0 8px; }
+  .lab-chip    { font-size: 10px; padding: 8px 14px; }
+  .lab-content { width: 92vw; }
+
+  /* ── Color overlay snap (smaller transition range) ── */
+  #colorOverlay, #darkOverlay { transition: none; }
+}
+
+/* ── Tablet (768–1024px) ── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  #matiMenu   { width: 420px; }
+  .panel-name span { font-size: clamp(28px, 4vw, 40px); }
 }

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mati Duclós — Creative Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/jpeg" href="img/ico.jpg" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Cursor — outside stage so it stays viewport-relative -->
+  <div class="cursor" id="cursor">
+    <img class="cursor-face" id="cursorFace" src="IMG/cursor-1.png" draggable="false" alt="" />
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       MATIMENU — About / bio panel
+  ════════════════════════════════════════ -->
+  <aside id="matiMenu">
+    <button class="panel-close" id="panelClose"><i class="ri-close-line"></i></button>
+
+    <div class="panel-name">
+      <span>Mati</span>
+      <span>Duclós</span>
+    </div>
+
+    <div class="panel-tags">
+      <span class="panel-tag">UX Designer</span>
+      <span class="panel-tag">UI Designer</span>
+      <span class="panel-tag">Art Director</span>
+      <span class="panel-tag">CCO · AI</span>
+      <span class="panel-tag">Creative Mind</span>
+      <span class="panel-tag">Multimedial</span>
+    </div>
+
+    <div class="panel-section">
+      <h4 class="panel-section-title">Experience</h4>
+      <div class="panel-exp-list">
+
+        <div class="panel-exp-item">
+          <div class="panel-exp-header">
+            <span class="panel-exp-role">Creative Chief Officer · AI</span>
+            <span class="panel-exp-company">1778 Studio</span>
+          </div>
+          <p>Creative leadership in digital projects with focus on innovation and design strategy.</p>
+        </div>
+
+        <div class="panel-exp-item">
+          <div class="panel-exp-header">
+            <span class="panel-exp-role">SSR UX &amp; UI Designer</span>
+            <span class="panel-exp-company">Banco Nación</span>
+          </div>
+          <p>Design of the new Digital Banking and multiple applications used by over 19 million people.</p>
+        </div>
+
+        <div class="panel-exp-item">
+          <div class="panel-exp-header">
+            <span class="panel-exp-role">Head of Art Direction</span>
+            <span class="panel-exp-company">FRERES</span>
+          </div>
+          <p>Art direction and creative campaign development across multimedia.</p>
+        </div>
+
+        <div class="panel-exp-item">
+          <div class="panel-exp-header">
+            <span class="panel-exp-role">SSR Multimedial Designer &amp; Art Director</span>
+            <span class="panel-exp-company">VIAMO</span>
+          </div>
+          <p>Multimedia design and creative direction in complex digital solutions.</p>
+        </div>
+
+        <div class="panel-exp-item">
+          <div class="panel-exp-header">
+            <span class="panel-exp-role">UX Designer</span>
+            <span class="panel-exp-company">Uniclix</span>
+          </div>
+          <p>Development of design systems and user experience architecture.</p>
+        </div>
+
+        <div class="panel-exp-item">
+          <div class="panel-exp-header">
+            <span class="panel-exp-role">Graphic Designer</span>
+            <span class="panel-exp-company">Leal Corp</span>
+          </div>
+          <p>Development of fashion catalogs and visual communication.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h4 class="panel-section-title">Contact</h4>
+      <a href="mailto:matiasduclosmd@gmail.com" class="panel-link">matiasduclosmd@gmail.com</a>
+      <div class="panel-socials">
+        <a href="https://linkedin.com/in/matiasduclos" class="panel-social-link" target="_blank">
+          <i class="ri-linkedin-fill"></i><span>LinkedIn</span>
+        </a>
+        <a href="https://instagram.com/matiasduclos" class="panel-social-link" target="_blank">
+          <i class="ri-instagram-fill"></i><span>Instagram</span>
+        </a>
+        <a href="https://x.com/matiasduclos" class="panel-social-link" target="_blank">
+          <i class="ri-twitter-x-fill"></i><span>X</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- SVG filters (hidden) -->
+  <svg id="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <filter id="liquid-reveal" color-interpolation-filters="sRGB" x="-30%" y="-30%" width="160%" height="160%">
+        <feTurbulence id="ft-turb" type="fractalNoise" baseFrequency="0.048 0.042" numOctaves="4" result="noise" seed="7"/>
+        <feDisplacementMap id="ft-disp" in="SourceGraphic" in2="noise" scale="110" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- ═══════════════════════════════════════
+       STAGE — shifts right when MatiMenu opens
+  ════════════════════════════════════════ -->
+  <div id="stage">
+
+    <canvas id="bg-canvas"></canvas>
+    <div id="colorOverlay"></div>
+
+    <!-- Nav -->
+    <nav class="navbar" id="navbar">
+      <button class="nav-brand" id="navBrand">
+        <img class="nav-logo" src="img/ico.jpg" alt="Mati Duclós" />
+        <span>Mati Duclós</span>
+      </button>
+      <button class="nav-btn" id="darkToggle" data-magnetic>
+        <span class="nav-dot"></span>
+        <span>Dark Mode</span>
+      </button>
+    </nav>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="footer-right">
+        <span class="footer-text">Buenos Aires, AR</span>
+        <span class="footer-text" id="clock">--:--:--</span>
+      </div>
+    </footer>
+
+    <!-- ─── HERO ──────────────────────────── -->
+    <section class="hero" id="hero">
+      <div class="hero-message" id="heroMessage">
+        <div class="hero-avatar">MD</div>
+        <h2 class="hero-tagline" id="heroTagline"></h2>
+      </div>
+      <h1 class="headline" id="headline" aria-label="Creative Lab.">Creative Lab.</h1>
+      <div class="hero-btns" id="heroBtns">
+        <a href="#" class="hero-btn" data-magnetic>Check my X</a>
+        <a href="#" class="hero-btn" data-magnetic>Check my piramidal scam</a>
+      </div>
+    </section>
+
+    <!-- ─── WORKS ─────────────────────────── -->
+    <div class="cards-layer" id="works">
+      <div class="cards-stage" id="cardsStage">
+        <div class="project-card" id="pc0">
+          <div class="card-thumb c1"><div class="card-shine"></div><div class="card-thumb-inner"><span class="card-tag">Branding</span></div></div>
+          <span class="card-label">Project 01</span>
+        </div>
+        <div class="project-card" id="pc1">
+          <div class="card-thumb c2"><div class="card-shine"></div><div class="card-thumb-inner"><span class="card-tag">Web Design</span></div></div>
+          <span class="card-label">Project 02</span>
+        </div>
+        <div class="project-card" id="pc2">
+          <div class="card-thumb c3"><div class="card-shine"></div><div class="card-thumb-inner"><span class="card-tag">Motion</span></div></div>
+          <span class="card-label">Project 03</span>
+        </div>
+        <div class="project-card" id="pc3">
+          <div class="card-thumb c4"><div class="card-shine"></div><div class="card-thumb-inner"><span class="card-tag">Identity</span></div></div>
+          <span class="card-label">Project 04</span>
+        </div>
+        <div class="project-card" id="pc4">
+          <div class="card-thumb c5"><div class="card-shine"></div><div class="card-thumb-inner"><span class="card-tag">Editorial</span></div></div>
+          <span class="card-label">Project 05</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /stage -->
+
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -143,10 +143,11 @@ document.fonts.ready.then(() => {
   setupClock();
   setupSectionNav();
   setupLabChips();
+  setupLabParticles();
   setupAccessSection();
   setupDitherReveal();
+  splitAndAnimateHeadline(); // split primero para que setupIntro mida los chars reales
   setupIntro();              // mide headline → arranca animación de carga
-  splitAndAnimateHeadline(); // corre inmediatamente BAJO el overlay (invisible)
   setupHeadlineWeightHover();
 });
 
@@ -350,6 +351,126 @@ const getAccessProgress = () =>
 const navbarEl    = document.querySelector('.navbar');
 const sectionNavEl = document.getElementById('sectionNav');
 
+// ─── LAB PARTICLES ───────────────────────────────────────────────────────────
+let _labParticles      = null;
+let _labParticlesOn    = false;
+
+function setupLabParticles() {
+  if (isTouch()) return;                     // solo desktop con mouse
+
+  const titleEl = labSectionEl.querySelector('.lab-title');
+  if (!titleEl) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.setAttribute('aria-hidden', 'true');
+  canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:2;';
+  labSectionEl.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+
+  const RADIUS = 150;   // radio de influencia del cursor
+  const SPRING = 0.055; // fuerza de retorno
+  const DRAG   = 0.88;  // fricción
+  const PUSH   = 32;    // fuerza de repulsión
+
+  let particles = [];
+  let mouse     = { x: -9999, y: -9999 };
+  let rafId     = null;
+
+  function build() {
+    const W   = window.innerWidth;
+    const H   = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width  = W;
+    canvas.height = H;
+
+    const rect  = titleEl.getBoundingClientRect();
+    const style = getComputedStyle(titleEl);
+    const fs    = parseFloat(style.fontSize);
+    const lh    = fs * 0.9;
+    const cx    = W / 2;
+    const cy    = rect.top + rect.height / 2;
+
+    // Offscreen a DPR para anti-aliasing fino
+    const PW = W * dpr;
+    const PH = H * dpr;
+    const off    = document.createElement('canvas');
+    off.width    = PW;
+    off.height   = PH;
+    const octx   = off.getContext('2d');
+    octx.scale(dpr, dpr);
+    octx.fillStyle    = '#fff';
+    octx.font         = `900 ${fs}px 'Geist Mono', monospace`;
+    octx.textAlign    = 'center';
+    octx.textBaseline = 'middle';
+    if ('letterSpacing' in octx) octx.letterSpacing = `${-0.025 * fs}px`;
+
+    octx.fillText('EXPERIMENTAL', cx, cy - lh * 0.58);
+    octx.fillText('SYSTEMS',      cx, cy + lh * 0.52);
+
+    const data = octx.getImageData(0, 0, PW, PH).data;
+    particles  = [];
+
+    // Sample each CSS pixel (physical step = dpr)
+    for (let py = 0; py < PH; py += dpr) {
+      for (let px = 0; px < PW; px += dpr) {
+        if (data[(py * PW + px) * 4 + 3] > 60) {
+          const x = px / dpr;
+          const y = py / dpr;
+          particles.push({ x, y, ox: x, oy: y, vx: 0, vy: 0 });
+        }
+      }
+    }
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#F4F3EE';
+
+    for (const p of particles) {
+      const dx = p.x - mouse.x;
+      const dy = p.y - mouse.y;
+      const d  = Math.hypot(dx, dy);
+
+      if (d < RADIUS && d > 0) {
+        const f = (RADIUS - d) / RADIUS;
+        p.vx += (dx / d) * f * PUSH;
+        p.vy += (dy / d) * f * PUSH;
+      }
+
+      p.vx += (p.ox - p.x) * SPRING;
+      p.vy += (p.oy - p.y) * SPRING;
+      p.vx *= DRAG;
+      p.vy *= DRAG;
+      p.x  += p.vx;
+      p.y  += p.vy;
+
+      ctx.fillRect(p.x, p.y, 1, 1);
+    }
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  _labParticles = {
+    activate() {
+      build();
+      titleEl.style.opacity = '0';
+      titleEl.style.transition = 'none';
+      loop();
+    },
+    deactivate() {
+      cancelAnimationFrame(rafId);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      titleEl.style.opacity   = '';
+      titleEl.style.transition = '';
+      particles = [];
+    },
+  };
+
+  window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  window.addEventListener('resize',    ()  => { if (_labParticlesOn) build(); });
+}
+
 function updateLab(lp) {
   const t = smoothstep(lp);
 
@@ -369,6 +490,17 @@ function updateLab(lp) {
   labSectionEl.style.opacity      = smoothstep(Math.max(0, (lp - 0.2) / 0.8));
   labSectionEl.style.transform    = `translateY(${lerp(50, 0, easeOutQuad(lp))}px)`;
   labSectionEl.style.pointerEvents = lp >= 0.95 ? 'auto' : 'none';
+
+  // 5. Particles — activar cuando lab está completamente visible
+  if (_labParticles) {
+    if (lp >= 0.99 && !_labParticlesOn) {
+      _labParticlesOn = true;
+      _labParticles.activate();
+    } else if (lp < 0.95 && _labParticlesOn) {
+      _labParticlesOn = false;
+      _labParticles.deactivate();
+    }
+  }
 }
 
 function updateHeadline(progress) {
@@ -1396,38 +1528,55 @@ function setupIntro() {
   gsap.set('.hero-btn', { opacity: 0, scale: 0, filter: 'blur(10px)' });
   gsap.set(sectionNavEl, { yPercent: -50, x: 20, opacity: 0 });
 
-  // Probe element: mide dónde quedarían las palabras en la posición exacta del headline
-  const hlStyle = getComputedStyle(headlineEl);
-  const hlRect  = headlineEl.getBoundingClientRect();
+  // Mobile: centra los intro-labels con GSAP antes de medir
+  if (isMobile()) {
+    gsap.set(creative, { xPercent: -50 });
+    gsap.set(lab,      { xPercent: -50 });
+  }
 
-  const probe = document.createElement('div');
-  probe.style.cssText = [
-    'position:fixed', 'visibility:hidden', 'pointer-events:none',
-    `top:${hlRect.top}px`, 'left:50%', 'transform:translateX(-50%)',
-    `font-family:${hlStyle.fontFamily}`,
-    `font-size:${hlStyle.fontSize}`,
-    'font-weight:900',
-    `letter-spacing:${hlStyle.letterSpacing}`,
-    'text-transform:uppercase',
-    'white-space:nowrap',
-    `line-height:${hlStyle.lineHeight}`,
-  ].join(';');
-  probe.innerHTML = '<span id="_pc">CREATIVE</span> <span id="_pl">LAB.</span>';
-  document.body.appendChild(probe);
+  let cDX, cDY, lDX, lDY;
 
-  const tC = probe.querySelector('#_pc').getBoundingClientRect();
-  const tL = probe.querySelector('#_pl').getBoundingClientRect();
-  document.body.removeChild(probe);
+  if (isMobile()) {
+    // Mide los char-clips reales del headline (ya splitteado)
+    // "Creative Lab." → C(0)r(1)e(2)a(3)t(4)i(5)v(6)e(7) space(8) L(9)a(10)b(11).(12)
+    const charClips = headlineEl.querySelectorAll('.char-clip');
 
-  // Posiciones iniciales (esquinas)
-  const cRect = creative.getBoundingClientRect();
-  const lRect = lab.getBoundingClientRect();
+    const cFirstRect = charClips[0].getBoundingClientRect(); // 'C'
+    const cLastRect  = charClips[7].getBoundingClientRect(); // 'E'
+    const lFirstRect = charClips[9].getBoundingClientRect(); // 'L'
+    const lLastRect  = charClips[12].getBoundingClientRect(); // '.'
 
-  // Deltas totales (inicio → destino final)
-  const cDX = tC.left - cRect.left;
-  const cDY = tC.top  - cRect.top;
-  const lDX = tL.left - lRect.left;
-  const lDY = tL.top  - lRect.top;
+    // Centro horizontal real de cada palabra en el headline
+    const cHeadlineCX = (cFirstRect.left + cLastRect.right) / 2;
+    const lHeadlineCX = (lFirstRect.left + lLastRect.right) / 2;
+
+    const cRect = creative.getBoundingClientRect();
+    const lRect = lab.getBoundingClientRect();
+
+    // Centro horizontal de los intro-elements (centrados con xPercent: -50)
+    const cIntroCX = cRect.left + cRect.width / 2;
+    const lIntroCX = lRect.left + lRect.width / 2;
+
+    cDX = cHeadlineCX - cIntroCX;
+    cDY = cFirstRect.top - cRect.top;
+    lDX = lHeadlineCX - lIntroCX;
+    lDY = lFirstRect.top - lRect.top;
+  } else {
+    // Desktop: mide los char-clips reales del headline (ya splitteado)
+    // "Creative Lab." → C(0)r(1)e(2)a(3)t(4)i(5)v(6)e(7) space(8) L(9)a(10)b(11).(12)
+    const charClips = headlineEl.querySelectorAll('.char-clip');
+
+    const cClipRect = charClips[0].getBoundingClientRect(); // 'C' — inicio de CREATIVE
+    const lClipRect = charClips[9].getBoundingClientRect(); // 'L' — inicio de LAB.
+
+    const cRect = creative.getBoundingClientRect();
+    const lRect = lab.getBoundingClientRect();
+
+    cDX = cClipRect.left - cRect.left;
+    cDY = cClipRect.top  - cRect.top;
+    lDX = lClipRect.left - lRect.left;
+    lDY = lClipRect.top  - lRect.top;
+  }
 
   const tl = gsap.timeline({
     onComplete() {
@@ -1458,6 +1607,7 @@ function setupIntro() {
         opacity: 0.75, scale: 1, filter: 'blur(0px)',
         stagger: 0.1, duration: 1.1, ease: 'elastic.out(1, 0.52)',
         delay: 0.5,
+        onComplete: () => gsap.set('.hero-btn', { clearProps: 'opacity' }),
       });
       gsap.fromTo(heroParaWrapEl,
         { y: 10, opacity: 0 },
@@ -1492,20 +1642,24 @@ function setupIntro() {
     },
   });
 
-  // Peso tipográfico: 200 → 900 a lo largo de toda la animación
+  // Peso tipográfico: 200 → 900
   tl.to([creative, lab], {
     fontWeight: 900,
-    duration: 1.85,
+    duration: isMobile() ? 1.4 : 1.85,
     ease: 'power2.inOut',
-  }, 0)
+  }, 0);
 
-  // Fase 1 — convergencia vertical (CREATIVE baja, LAB. sube)
-  .to(creative, { y: cDY, duration: 1.0, ease: 'power3.inOut' }, 0)
-  .to(lab,      { y: lDY, duration: 1.0, ease: 'power3.inOut' }, 0)
-
-  // Fase 2 — convergencia horizontal al centro del headline
-  .to(creative, { x: cDX, duration: 0.85, ease: 'expo.inOut' }, 1.0)
-  .to(lab,      { x: lDX, duration: 0.85, ease: 'expo.inOut' }, 1.0);
+  if (isMobile()) {
+    // Mobile: CREATIVE baja desde arriba, LAB. sube desde abajo → se encuentran en el centro
+    tl.to(creative, { x: cDX, y: cDY, duration: 1.2, ease: 'power3.inOut' }, 0)
+      .to(lab,      { x: lDX, y: lDY, duration: 1.2, ease: 'power3.inOut' }, 0);
+  } else {
+    // Desktop: Fase 1 vertical + Fase 2 horizontal
+    tl.to(creative, { y: cDY, duration: 1.0, ease: 'power3.inOut' }, 0)
+      .to(lab,      { y: lDY, duration: 1.0, ease: 'power3.inOut' }, 0)
+      .to(creative, { x: cDX, duration: 0.85, ease: 'expo.inOut' }, 1.0)
+      .to(lab,      { x: lDX, duration: 0.85, ease: 'expo.inOut' }, 1.0);
+  }
 }
 
 // ─── HEADLINE WEIGHT HOVER ───────────────────────────────────────────────────

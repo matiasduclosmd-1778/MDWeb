@@ -356,7 +356,7 @@ let _labParticles      = null;
 let _labParticlesOn    = false;
 
 function setupLabParticles() {
-  if (isTouch()) return;                     // solo desktop con mouse
+  if (isTouch()) return;
 
   const titleEl = labSectionEl.querySelector('.lab-title');
   if (!titleEl) return;
@@ -368,10 +368,77 @@ function setupLabParticles() {
 
   const ctx = canvas.getContext('2d');
 
-  const RADIUS = 150;   // radio de influencia del cursor
-  const SPRING = 0.055; // fuerza de retorno
-  const DRAG   = 0.88;  // fricción
-  const PUSH   = 32;    // fuerza de repulsión
+  const RADIUS  = 50;
+  const SPRING  = 0.042;
+  const DRAG    = 0.91;
+  const PUSH    = 18;
+  const PERTURB = 0.6;
+
+  // Displacement field: grilla de vectores 2D que evoluciona lentamente
+  const GCOLS = 16;
+  const GROWS = 16;
+  let dispGrid   = [];
+  let dispTarget = [];
+  let dispFrame  = 0;
+
+  function buildDispGrid() {
+    dispGrid   = [];
+    dispTarget = [];
+    for (let r = 0; r <= GROWS; r++) {
+      dispGrid[r]   = [];
+      dispTarget[r] = [];
+      for (let c = 0; c <= GCOLS; c++) {
+        let a = Math.random() * Math.PI * 2;
+        dispGrid[r][c] = { x: Math.cos(a), y: Math.sin(a) };
+        a = Math.random() * Math.PI * 2;
+        dispTarget[r][c] = { x: Math.cos(a), y: Math.sin(a) };
+      }
+    }
+  }
+
+  function evolveDisp() {
+    dispFrame++;
+    // Cada ~3s rota algunos vectores objetivo
+    if (dispFrame % 180 === 0) {
+      for (let r = 0; r <= GROWS; r++) {
+        for (let c = 0; c <= GCOLS; c++) {
+          if (Math.random() < 0.25) {
+            const a = Math.random() * Math.PI * 2;
+            dispTarget[r][c] = { x: Math.cos(a), y: Math.sin(a) };
+          }
+        }
+      }
+    }
+    for (let r = 0; r <= GROWS; r++) {
+      for (let c = 0; c <= GCOLS; c++) {
+        const g = dispGrid[r][c];
+        const t = dispTarget[r][c];
+        g.x += (t.x - g.x) * 0.006;
+        g.y += (t.y - g.y) * 0.006;
+      }
+    }
+  }
+
+  function sampleDisp(px, py, W, H) {
+    const gx = Math.max(0, Math.min((px / W) * GCOLS, GCOLS - 0.001));
+    const gy = Math.max(0, Math.min((py / H) * GROWS, GROWS - 0.001));
+    const ic = Math.floor(gx);
+    const ir = Math.floor(gy);
+    const fx = gx - ic;
+    const fy = gy - ir;
+    const ux = fx * fx * (3 - 2 * fx);
+    const uy = fy * fy * (3 - 2 * fy);
+    const a = dispGrid[ir][ic];
+    const b = dispGrid[ir][ic + 1];
+    const c = dispGrid[ir + 1][ic];
+    const d = dispGrid[ir + 1][ic + 1];
+    return {
+      x: (a.x + (b.x - a.x) * ux) * (1 - uy) + (c.x + (d.x - c.x) * ux) * uy,
+      y: (a.y + (b.y - a.y) * ux) * (1 - uy) + (c.y + (d.y - c.y) * ux) * uy,
+    };
+  }
+
+  const originOffset = { y: 0 }; // animado por GSAP para desplazar suavemente los orígenes
 
   let particles = [];
   let mouse     = { x: -9999, y: -9999 };
@@ -391,27 +458,23 @@ function setupLabParticles() {
     const cx    = W / 2;
     const cy    = rect.top + rect.height / 2;
 
-    // Offscreen a DPR para anti-aliasing fino
     const PW = W * dpr;
     const PH = H * dpr;
-    const off    = document.createElement('canvas');
-    off.width    = PW;
-    off.height   = PH;
-    const octx   = off.getContext('2d');
+    const off  = document.createElement('canvas');
+    off.width  = PW;
+    off.height = PH;
+    const octx = off.getContext('2d');
     octx.scale(dpr, dpr);
     octx.fillStyle    = '#fff';
     octx.font         = `900 ${fs}px 'Geist Mono', monospace`;
     octx.textAlign    = 'center';
     octx.textBaseline = 'middle';
     if ('letterSpacing' in octx) octx.letterSpacing = `${-0.025 * fs}px`;
-
     octx.fillText('EXPERIMENTAL', cx, cy - lh * 0.58);
     octx.fillText('SYSTEMS',      cx, cy + lh * 0.52);
 
     const data = octx.getImageData(0, 0, PW, PH).data;
     particles  = [];
-
-    // Sample each CSS pixel (physical step = dpr)
     for (let py = 0; py < PH; py += dpr) {
       for (let px = 0; px < PW; px += dpr) {
         if (data[(py * PW + px) * 4 + 3] > 60) {
@@ -421,25 +484,43 @@ function setupLabParticles() {
         }
       }
     }
+    buildDispGrid();
   }
 
   function loop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#F4F3EE';
+
+    evolveDisp();
 
     for (const p of particles) {
       const dx = p.x - mouse.x;
       const dy = p.y - mouse.y;
       const d  = Math.hypot(dx, dy);
 
-      if (d < RADIUS && d > 0) {
-        const f = (RADIUS - d) / RADIUS;
-        p.vx += (dx / d) * f * PUSH;
-        p.vy += (dy / d) * f * PUSH;
+      // Área de influencia ampliada para acomodar el blob
+      if (d < RADIUS * 1.6 && d > 0) {
+        const disp = sampleDisp(p.x, p.y, W, H);
+        // El displacement distorsiona la distancia efectiva → blob orgánico, no círculo
+        const effD = d - (disp.x + disp.y) * RADIUS * 0.38;
+        const f    = effD < RADIUS ? Math.exp(-3 * (Math.max(0, effD) / RADIUS) ** 2) : 0;
+        if (f > 0.008) {
+          const dirX = dx / d + disp.x * PERTURB;
+          const dirY = dy / d + disp.y * PERTURB;
+          const len  = Math.hypot(dirX, dirY) || 1;
+          p.vx += (dirX / len) * f * PUSH;
+          p.vy += (dirY / len) * f * PUSH;
+        }
       }
 
-      p.vx += (p.ox - p.x) * SPRING;
-      p.vy += (p.oy - p.y) * SPRING;
+      // Spring: se suprime cuando el origen está bajo el cursor (evita la órbita)
+      const dox = p.ox - mouse.x;
+      const doy = (p.oy + originOffset.y) - mouse.y;
+      const springScale = Math.min(1, Math.hypot(dox, doy) / RADIUS);
+      p.vx += (p.ox - p.x) * SPRING * springScale;
+      p.vy += ((p.oy + originOffset.y) - p.y) * SPRING * springScale;
       p.vx *= DRAG;
       p.vy *= DRAG;
       p.x  += p.vx;
@@ -460,10 +541,14 @@ function setupLabParticles() {
     },
     deactivate() {
       cancelAnimationFrame(rafId);
+      rafId = null;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       titleEl.style.opacity   = '';
       titleEl.style.transition = '';
       particles = [];
+    },
+    shiftOrigins(dy, duration, ease) {
+      gsap.to(originOffset, { y: dy, duration, ease });
     },
   };
 
@@ -1437,8 +1522,13 @@ function setupAccessSection() {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 function setupLabChips() {
-  const chips   = document.querySelectorAll('.lab-chip');
-  const content = document.getElementById('labContent');
+  const chips    = document.querySelectorAll('.lab-chip');
+  const content  = document.getElementById('labContent');
+  const labHeader = [
+    labSectionEl.querySelector('.lab-tag'),
+    labSectionEl.querySelector('.lab-title'),
+    labSectionEl.querySelector('.lab-chips'),
+  ];
 
   // Extraer el bloque bash del .md e inyectarlo en el terminal
   const bashMatch = rawSkill.match(/```bash\n([\s\S]*?)\n```/);
@@ -1474,15 +1564,21 @@ function setupLabChips() {
       chips.forEach(c => c.classList.remove('active'));
       document.querySelectorAll('.lab-panel').forEach(p => p.classList.remove('visible'));
 
+      const EXTRA = 32; // px extra hacia arriba sobre el recentrado del flex
+
       if (isActive) {
+        gsap.to(labHeader, { y: 0, duration: 0.35, ease: 'power3.inOut' });
         gsap.to(content, { height: 0, duration: 0.35, ease: 'power3.inOut' });
+        _labParticles?.shiftOrigins(0, 0.35, 'power3.inOut');
       } else {
         chip.classList.add('active');
         const panel = document.querySelector(`.lab-panel[data-panel="${chip.dataset.lab}"]`);
         if (panel) {
           panel.classList.add('visible');
           const h = chip.dataset.lab === 'audit' ? 340 : 120;
+          gsap.to(labHeader, { y: -EXTRA, duration: 0.45, ease: 'power3.out' });
           gsap.to(content, { height: h, duration: 0.45, ease: 'power3.out' });
+          _labParticles?.shiftOrigins(-((h + 16) / 2 + EXTRA), 0.45, 'power3.out');
         }
       }
     });

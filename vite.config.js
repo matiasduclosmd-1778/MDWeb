@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 
-export default defineConfig({
-  server: { port: 5500 }
-})
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/MDWeb/' : '/',
+  server: { port: 5500 },
+}))

@@ -206,6 +206,9 @@ function setupLenis() {
 }
 
 // ─── CUSTOM CURSOR ───────────────────────────────────────────────────────────
+const CURSOR_1 = new URL('../img/cursor-1.png', import.meta.url).href;
+const CURSOR_2 = new URL('../img/cursor-2.png', import.meta.url).href;
+
 function setupCursor() {
   if (isTouch()) return; // touch devices use native cursor
 
@@ -224,12 +227,12 @@ function setupCursor() {
 
   // Click: swap face
   document.addEventListener('mousedown', () => {
-    faceEl.src = 'img/cursor-2.png';
+    faceEl.src = CURSOR_2;
     document.body.classList.remove('cur-hover');
     document.body.classList.add('cur-down');
   });
   document.addEventListener('mouseup', () => {
-    faceEl.src = 'img/cursor-1.png';
+    faceEl.src = CURSOR_1;
     document.body.classList.remove('cur-down');
   });
 }

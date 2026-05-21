@@ -684,6 +684,10 @@ html.dark .navbar.on-dark .switch-track::after { background: #111111; }
   text-align: center;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .lab-title { opacity: 0; }
+}
+
 .lab-tag    { position: relative; z-index: 3; }
 
 .lab-chips {
@@ -691,7 +695,7 @@ html.dark .navbar.on-dark .switch-track::after { background: #111111; }
   flex-wrap: wrap;
   gap: 16px;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: 64px;
   position: relative;
   z-index: 3;
 }

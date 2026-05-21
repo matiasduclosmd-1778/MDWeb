@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/MDWeb/' : '/',
+export default defineConfig(() => ({
+  base: process.env.GITHUB_PAGES === 'true' ? '/MDWeb/' : '/',
   server: { port: 5500 },
 }))

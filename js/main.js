@@ -350,6 +350,11 @@ const getLabProgress = () =>
 const ACCESS_START   = () => THRESHOLD() + LAB_DURATION() + window.innerHeight * 0.5;
 const getAccessProgress = () =>
   Math.max(0, Math.min(1, (scrollY - ACCESS_START()) / (window.innerHeight * 0.25)));
+// HOW TO — slides in from the right after Lab is settled
+const HOW_TO_START    = () => THRESHOLD() + LAB_DURATION() + window.innerHeight * 0.8;
+const HOW_TO_DURATION = () => window.innerHeight * 1.2;
+const getHowToProgress = () =>
+  Math.max(0, Math.min(1, (scrollY - HOW_TO_START()) / HOW_TO_DURATION()));
 
 const navbarEl    = document.querySelector('.navbar');
 const sectionNavEl = document.getElementById('sectionNav');
@@ -614,12 +619,22 @@ function updateHeadline(progress) {
 
 // Para typing uses span-per-word system — scroll accel handled inside the timer
 
+const howToSectionEl = document.getElementById('howToSection');
+
+function updateHowTo(hp) {
+  if (!howToSectionEl) return;
+  const tx = lerp(100, 0, easeOutQuad(hp));
+  howToSectionEl.style.transform    = `translateX(${tx}vw)`;
+  howToSectionEl.style.pointerEvents = hp >= 0.98 ? 'auto' : 'none';
+}
+
 function updateCards() {
   const progress    = Math.max(0, Math.min(1, scrollY / THRESHOLD()));
   const labProgress = getLabProgress();
 
   updateHeadline(progress);
   updateLab(labProgress);
+  updateHowTo(getHowToProgress());
   updateSectionNavActive(progress, labProgress);
 
   const P1 = 0.42;
@@ -1533,9 +1548,21 @@ function setupLabChips() {
     labSectionEl.querySelector('.lab-chips'),
   ];
 
-  // Extraer el bloque bash del .md e inyectarlo en el terminal
-  const bashMatch = rawSkill.match(/```bash\n([\s\S]*?)\n```/);
-  const skillText = bashMatch ? bashMatch[1].trim() : rawSkill.trim();
+  // Extraer el bloque bash del .md contando nesting (el bloque contiene sub-fences)
+  function extractBashBlock(md) {
+    const lines = md.split('\n');
+    let depth = 0, capturing = false;
+    const out = [];
+    for (const line of lines) {
+      if (!capturing && line.trim() === '```bash') { capturing = true; depth = 1; continue; }
+      if (!capturing) continue;
+      if (line.startsWith('```') && line.slice(3).trim()) { depth++; out.push(line); continue; }
+      if (line.trim() === '```') { if (--depth === 0) break; out.push(line); continue; }
+      out.push(line);
+    }
+    return out.join('\n').trim();
+  }
+  const skillText = extractBashBlock(rawSkill) || rawSkill.trim();
   const codeEl = document.getElementById('auditCode');
   if (codeEl) codeEl.textContent = skillText;
 
@@ -1597,6 +1624,7 @@ function setupSectionNav() {
       let target = 0;
       if (section === 'works') target = THRESHOLD() * 0.55;
       if (section === 'lab')   target = THRESHOLD() + LAB_DURATION() * 0.65;
+      if (section === 'howto') target = HOW_TO_START() + HOW_TO_DURATION() * 0.5;
       lenis.scrollTo(target, { duration: 1.6, easing: t => 1 - Math.pow(1 - t, 4) });
     });
   });
@@ -1606,8 +1634,9 @@ function updateSectionNavActive(progress, labProgress) {
   if (!sectionNavEl) return;
   const items = sectionNavEl.querySelectorAll('.section-nav-item');
   let active = 'home';
-  if (labProgress >= 0.3)      active = 'lab';
-  else if (progress >= 0.12)   active = 'works';
+  if (getHowToProgress() >= 0.3)  active = 'howto';
+  else if (labProgress >= 0.3)    active = 'lab';
+  else if (progress >= 0.12)      active = 'works';
   items.forEach(item => {
     item.classList.toggle('active', item.dataset.section === active);
   });

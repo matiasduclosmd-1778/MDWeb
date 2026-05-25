@@ -43,7 +43,7 @@ html.dark {
 html, body {
   font-family: 'Geist Mono', monospace;
   background: var(--bg);
-  height: 420vh;          /* scroll room for Works + LAB transition */
+  height: 560vh;          /* scroll room for Works + LAB + How To transition */
   cursor: none;
   overflow-x: hidden;
   transition: background var(--t);
@@ -646,6 +646,34 @@ html.dark .navbar.on-dark .switch-track::after { background: #111111; }
   opacity: 0;
   pointer-events: none;
   will-change: opacity;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   HOW TO
+════════════════════════════════════════════════════════════════════════════════ */
+#howToSection {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: #e63232;
+  transform: translateX(100vw);
+  will-change: transform;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.how-to-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.how-to-title {
+  font-size: clamp(48px, 10vw, 120px);
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════

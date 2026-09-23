@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LET'S TALK — preguntas y respuestas del rostro
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Editá este archivo y guardá: el sitio se actualiza solo (no hace falta tocar
+# nada de codigo). Los chips que se ven en pantalla salen de aca, en este orden.
+#
+# Cada bloque se separa con una linea de tres guiones: ---
+#
+#   CHIP_EN / CHIP_ES:   el texto del boton sugerido en cada idioma
+#   KEYS:   palabras separadas por coma. Si el visitante escribe libremente y
+#           usa alguna, se elige esta respuesta. La que mas palabras coincida gana.
+#   ANSWER_EN / ANSWER_ES: la respuesta en cada idioma.
+#
+# El bloque FALLBACK es lo que contesta cuando no reconoce nada.
+# Las lineas que empiezan con # se ignoran.
+#
+# Ojo: estas respuestas las redacte yo a partir de lo que dice tu sitio.
+# Reescribilas con tus palabras.
+# ─────────────────────────────────────────────────────────────────────────────
+
+CHIP_EN: Who are you?
+CHIP_ES: ¿Quién sos?
+KEYS: who, name, about, yourself, quien, sos
+ANSWER_EN: Matías Duclós. UX designer from Buenos Aires, currently discovering the world of development.
+ANSWER_ES: Matías Duclós. Diseñador UX de Buenos Aires, ahora metido en el mundo del desarrollo.
+
+---
+
+CHIP_EN: What do you do?
+CHIP_ES: ¿Qué hacés?
+KEYS: do, work, design, role, hace, haces
+ANSWER_EN: Product and web design — and lately I build what I design. Figma, AI and Adobe CC, plus enough front-end to make it real.
+ANSWER_ES: Diseño de producto y web — y últimamente construyo lo que diseño. Figma, IA y Adobe CC, más el front-end necesario para que exista.
+
+---
+
+CHIP_EN: Your work
+CHIP_ES: Tus trabajos
+KEYS: project, portfolio, case, proyecto, trabajos
+ANSWER_EN: 1778 Studio, MDM Salud, FreresXArgentina and Halley. Scroll back up, they're all there.
+ANSWER_ES: 1778 Studio, MDM Salud, FreresXArgentina y Halley. Subí un poco, están todos ahí.
+
+---
+
+CHIP_EN: Your clients
+CHIP_ES: Tus clientes
+KEYS: client, brand, company, cliente, marca
+ANSWER_EN: Banco Nación, Red Bull, Viamo, Bola and Frères, among others.
+ANSWER_ES: Banco Nación, Red Bull, Viamo, Bola y Frères, entre otros.
+
+---
+
+CHIP_EN: Available?
+CHIP_ES: ¿Disponible?
+KEYS: available, hire, freelance, job, trabajo, disponible
+ANSWER_EN: Usually, yes. Write to matiasduclosmd@gmail.com and let's talk properly.
+ANSWER_ES: Por lo general sí. Escribime a matiasduclosmd@gmail.com y hablamos bien.
+
+---
+
+CHIP_EN: Where are you?
+CHIP_ES: ¿Dónde estás?
+KEYS: where, city, country, remote, donde, ciudad
+ANSWER_EN: Buenos Aires, Argentina. I work with people anywhere.
+ANSWER_ES: Buenos Aires, Argentina. Trabajo con gente de cualquier lado.
+
+---
+
+FALLBACK_EN: I don't have an answer for that one yet. Try one of the suggestions, or just write to matiasduclosmd@gmail.com.
+FALLBACK_ES: Todavía no tengo respuesta para eso. Probá con alguna de las sugerencias, o escribime a matiasduclosmd@gmail.com.

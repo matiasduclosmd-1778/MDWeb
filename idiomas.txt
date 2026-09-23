@@ -1,0 +1,200 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# IDIOMAS — textos de la interfaz
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Editá y guardá: el sitio se actualiza solo.
+# Cada bloque se separa con tres guiones: ---
+#
+#   KEY: el identificador que lleva el elemento en data-i18n
+#   EN:  texto en ingles  (es el idioma por defecto)
+#   ES:  texto en español
+#
+# Si falta ES, se muestra EN. Las lineas con # se ignoran.
+#
+# Los nombres propios (Banco Nación, VIAMO, Halley...) no estan aca:
+# no se traducen.
+# ─────────────────────────────────────────────────────────────────────────────
+
+KEY: nav.contact
+EN: Contact me
+ES: Contacto
+
+---
+
+KEY: nav.home
+EN: Home
+ES: Inicio
+
+---
+
+KEY: nav.works
+EN: Works
+ES: Proyectos
+
+---
+
+KEY: hero.msg
+EN: Hi, this is my
+ES: Hola, este es mi
+
+---
+
+KEY: hero.para
+EN: UX Designer discovering the world of development. Design experiments using Figma, AI and Adobe CC.
+ES: Diseñador UX descubriendo el mundo del desarrollo. Experimentos de diseño con Figma, IA y Adobe CC.
+
+---
+
+KEY: hero.x
+EN: Check my X
+ES: Mirá mi X
+
+---
+
+KEY: hero.github
+EN: Look my Github
+ES: Mirá mi Github
+
+---
+
+KEY: hero.contact
+EN: Contact me
+ES: Contactame
+
+---
+
+KEY: panel.experience
+EN: Experience
+ES: Experiencia
+
+---
+
+KEY: panel.contact
+EN: Contact
+ES: Contacto
+
+---
+
+KEY: panel.tag1
+EN: UX Designer
+ES: Diseñador UX
+
+---
+
+KEY: panel.tag2
+EN: UI Designer
+ES: Diseñador UI
+
+---
+
+KEY: panel.tag3
+EN: Art Director
+ES: Director de Arte
+
+---
+
+KEY: panel.tag5
+EN: Creative Mind
+ES: Mente creativa
+
+---
+
+KEY: panel.tag6
+EN: Multimedial
+ES: Multimedial
+
+---
+
+KEY: panel.role1
+EN: Creative Chief Officer · AI
+ES: Director Creativo · IA
+
+---
+
+KEY: panel.role2
+EN: SSR UX & UI Designer
+ES: Diseñador UX & UI SSR
+
+---
+
+KEY: panel.role3
+EN: Head of Campaigns
+ES: Líder de Campañas
+
+---
+
+KEY: panel.role4
+EN: SSR Multimedial Designer & Art Director
+ES: Diseñador Multimedial SSR & Director de Arte
+
+---
+
+KEY: panel.role5
+EN: UX Designer
+ES: Diseñador UX
+
+---
+
+KEY: panel.role6
+EN: Graphic Designer
+ES: Diseñador Gráfico
+
+---
+
+KEY: works.title
+EN: Selected work
+ES: Trabajos seleccionados
+
+---
+
+KEY: works.role1
+EN: Web Design
+ES: Diseño Web
+
+---
+
+KEY: works.role2
+EN: Health · UX
+ES: Salud · UX
+
+---
+
+KEY: works.role3
+EN: IA Design · Frontend
+ES: Diseño IA · Frontend
+
+---
+
+KEY: works.role4
+EN: Brand Guidelines
+ES: Manual de Marca
+
+---
+
+KEY: mf.title
+EN: Manifesto
+ES: Manifiesto
+
+---
+
+KEY: lt.label
+EN: About
+ES: Sobre mí
+
+---
+
+KEY: lt.contact
+EN: Contact me
+ES: Contactame
+
+---
+
+KEY: lt.placeholder
+EN: Ask me something…
+ES: Preguntame algo…
+
+---
+
+KEY: work.open
+EN: open in a new tab
+ES: abrir en una pestaña nueva

@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MANIFIESTO — la charla entre Mati y la AI
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Editá y guardá: el sitio se actualiza solo.
+# Los bloques se separan con tres guiones: ---
+#
+#   WHO:   mati  o  ai
+#   TIME:  lo que se muestra al lado del nombre
+#   TEXT_EN / TEXT_ES:  el mensaje en cada idioma (pueden ocupar varias lineas)
+#   DRAFT: yes  -> este no es una burbuja: va en la barra de abajo,
+#                  escribiendose solo. Deberia ser el ultimo.
+#
+# Los mensajes de Mati son tuyos, salen del manifiesto que me pasaste.
+# Los de la AI los escribi yo — reescribilos si no te suenan.
+# ─────────────────────────────────────────────────────────────────────────────
+
+WHO: mati
+TIME: 13:30
+TEXT_EN: This is a stage. An artistic search.
+TEXT_ES: Esto es una etapa. Una búsqueda artística.
+
+---
+
+WHO: ai
+TIME: 13:30
+TEXT_EN: A stage that doesn't have a name yet. That's usually a good sign.
+TEXT_ES: Una etapa que todavía no tiene nombre. Suele ser buena señal.
+
+---
+
+WHO: mati
+TIME: 13:32
+TEXT_EN: I'm experimenting with AI as a creative partner. She brings speed and possibilities; I bring direction, judgement, intuition. Together we generate a dialogue where unexpected things come up.
+TEXT_ES: Estoy experimentando con AI como compañero creativo. Ella aporta velocidad y posibilidades; yo aporto dirección, criterio, intuición. Juntos generamos un diálogo donde surgen cosas inesperadas.
+
+---
+
+WHO: ai
+TIME: 13:34
+TEXT_EN: I don't know exactly what I'm looking for or where this ends. Some experiments will work out, others won't. That's part of the process.
+TEXT_ES: No sé exactamente qué estoy buscando ni dónde termina esto. Algunos experimentos saldrán bien, otros no. Eso es parte del proceso.
+
+---
+
+WHO: mati
+TIME: 13:36
+DRAFT: yes
+TEXT_EN: This portfolio is a snapshot of that search. Of how I'm creating and evolving today.
+TEXT_ES: Este portfolio es un snapshot de esa búsqueda. De cómo estoy creando y evolucionando hoy.

@@ -784,6 +784,10 @@ html.dark .client-logo {
 .mf-code {
   position: absolute;
   inset: 0;
+  /* Un canvas es elemento reemplazado: inset:0 NO lo estira, se dibuja a su
+     tamaño de buffer. En retina eso es el doble y se veia un recorte ampliado. */
+  width: 100%;
+  height: 100%;
   z-index: 4;               /* tapa el contenido */
   opacity: 0;
   pointer-events: none;
@@ -997,8 +1001,6 @@ html.dark .client-logo {
 @media (max-width: 767px) {
   .manifesto { padding: 0 6vw 16vh; }
   .mf-head { height: 72vh; }
-  .mf-lead  { margin-bottom: 6vh; }
-  .mf-p     { margin-bottom: 4vh; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -1013,7 +1015,10 @@ html.dark .client-logo {
   pointer-events: none;
 }
 .scroll-spacer {
-  height: 100vh;      /* el hero fijo se ve solo a traves de este hueco */
+  /* svh = viewport chico. Con 100vh el navegador mobile cuenta la barra de
+     direcciones: el hueco queda mas alto que la pantalla y el hero se corta. */
+  height: 100vh;
+  height: 100svh;
 }
 
 /* Posicionada y por encima del manifiesto (z 1): asi las burbujas que caen
@@ -1022,9 +1027,10 @@ html.dark .client-logo {
   position: relative;
   z-index: 2;
   pointer-events: auto;   /* vuelve a recibir clics dentro del main inerte */
-  min-height: 100vh;
+  /* Sin min-height: con 4 proyectos el contenido no llega a una pantalla y
+     forzarla dejaba un vacio enorme antes de Let's Talk. */
   background: var(--bg);
-  padding: 12vh 6vw 16vh;
+  padding: 14vh 6vw 16vh;
   transition: background var(--t);
 }
 
@@ -1155,10 +1161,12 @@ html.dark .client-logo {
 }
 
 @media (max-width: 767px) {
-  .works { padding: 8vh 5vw 12vh; }
+  .works { padding: 10vh 5vw 12vh; }
   .work-link { gap: 12px; padding: 18px 2px; }
   .work-index { width: 24px; font-size: 9px; }
-  .work-name { font-size: clamp(20px, 7.4vw, 34px); letter-spacing: -0.02em; }
+  /* 6.6vw y no 7.4: a 7.4 "FreresXArgentina" se cortaba con puntos suspensivos
+     en pantallas de 360px */
+  .work-name { font-size: clamp(18px, 6.6vw, 34px); letter-spacing: -0.02em; }
   .work-role { display: none; }
   .work-arrow { font-size: 15px; }
 }
@@ -1177,6 +1185,7 @@ html.dark .client-logo {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100svh;     /* idem: el retrato no puede pasarse del alto visible */
   overflow: hidden;
 }
 #letsTalkCanvas {
@@ -1346,11 +1355,12 @@ html.dark .client-logo {
 
 @media (max-width: 900px) {
   .lt-chat {
-    right: 5vw; left: 5vw; top: auto; bottom: 4vh;
+    /* 13vh deja pasar el switch de idioma, que vive en la misma esquina */
+    right: 5vw; left: 5vw; top: auto; bottom: 13vh;
     width: auto;
     transform: none;
   }
-  .lt-log { max-height: 30vh; }
+  .lt-log { max-height: 20vh; }
 }
 
 /* ─── SWITCH DE IDIOMA ─────────────────────────────────────────────────────── */
@@ -1390,7 +1400,8 @@ html.dark .client-logo {
 .lang-btn:hover:not([aria-pressed="true"]) { color: var(--text); }
 
 @media (max-width: 767px) {
-  .lang-switch { right: 14px; bottom: 14px; padding: 2px; }
+  /* Sube por encima del footer: a 14px se montaba sobre el reloj */
+  .lang-switch { right: 14px; bottom: 46px; padding: 2px; }
   .lang-btn { font-size: 9px; padding: 7px 11px; }
 }
 
@@ -1398,6 +1409,24 @@ html.dark .client-logo {
    TOUCH DEVICES — disable custom cursor
 ════════════════════════════════════════════════════════════════════════════════ */
 @media (hover: none), (pointer: coarse) {
+  /* backdrop-filter es de lo mas caro que hay, y en un telefono con 6 burbujas
+     de vidrio a la vez se come el scroll. Se cambia por un fondo mas solido:
+     visualmente casi igual, sin recalcular lo que hay detras en cada frame. */
+  .mf-msg, .mf-composer {
+    -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+  }
+  .mf-msg--mati { background: rgba(255,252,246,0.82); }
+  .mf-msg--ai   { background: rgba(255,252,246,0.68); }
+  .mf-composer  { background: rgba(255,252,246,0.86); }
+
+  /* El :hover queda pegado al tocar en mobile. Como la lluvia de codigo no se
+     crea en touch, el mensaje se ocultaba y la burbuja quedaba vacia. */
+  .mf-msg:hover { background: rgba(255,252,246,0.82); }
+  .mf-msg--ai:hover { background: rgba(255,252,246,0.68); }
+  .mf-msg:hover .mf-head-row,
+  .mf-msg:hover .mf-text { opacity: 1 !important; }
+
   html, body  { cursor: auto !important; }
   .cursor     { display: none !important; }
   /* restore interactive cursor for touch */

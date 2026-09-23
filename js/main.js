@@ -1131,6 +1131,9 @@ function setupBubbleDrop() {
   const composer = document.getElementById('mfComposer');
   if (!sec || !thread) return null;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
+  // En touch no: la fisica usa position fixed, y con la barra del navegador
+  // entrando y saliendo el piso se mueve debajo de las burbujas.
+  if (isTouch()) return null;
 
   const G    = 1850;   // gravedad px/s² — mas baja = caida mas larga
   const REST = 0.38;   // rebote
@@ -1550,6 +1553,53 @@ function sampleText(txt, fontCss, step) {
   return pts;
 }
 
+// ─── INCLINACION DEL TELEFONO ────────────────────────────────────────────────
+// En mobile no hay cursor, asi que la cara sigue como esta parado el telefono.
+// Alimenta las mismas variables que el mouse: el suavizado, los topes y el
+// desfase entre ojos y cuello no se tocan.
+function setupTilt(host, apply) {
+  if (!isTouch() || typeof DeviceOrientationEvent === 'undefined') return;
+
+  let base = null;    // postura de referencia
+  let idle = null;
+
+  function onOrient(e) {
+    if (e.beta == null || e.gamma == null) return;
+
+    // Rotar la pantalla intercambia los ejes del sensor
+    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    let x, y;
+    if      (ang === 90)                 { x = -e.beta;  y =  e.gamma; }
+    else if (ang === 270 || ang === -90) { x =  e.beta;  y = -e.gamma; }
+    else                                 { x =  e.gamma; y =  e.beta;  }
+
+    // Nadie sostiene el telefono en cero: la primera lectura es el punto neutro
+    // y se trabaja con la diferencia.
+    if (!base) base = { x, y };
+    const cl = v => Math.max(-1, Math.min(1, v));
+    apply(cl((x - base.x) / 26), cl((y - base.y) / 26));
+
+    // Si queda quieto un rato, se recalibra: la postura comoda cambia sola
+    clearTimeout(idle);
+    idle = setTimeout(() => { base = { x, y }; }, 2500);
+  }
+
+  const start = () => window.addEventListener('deviceorientation', onOrient);
+
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+ exige permiso, y solo lo acepta desde un gesto del usuario. Se
+    // pide al primer toque DENTRO de la seccion, asi el dialogo del sistema
+    // aparece mirando la cara y no suelto al entrar al sitio.
+    host.addEventListener('touchend', () => {
+      DeviceOrientationEvent.requestPermission()
+        .then(r => { if (r === 'granted') start(); })
+        .catch(() => { /* lo rechazo: queda quieta, no se rompe nada */ });
+    }, { once: true });
+  } else {
+    start();   // Android arranca sin pedir nada
+  }
+}
+
 function setupLetsTalk() {
   const track   = document.getElementById('letsTalk');        // el recorrido alto
   const wrap    = document.getElementById('letsTalkSticky');  // lo que se ve
@@ -1559,8 +1609,12 @@ function setupLetsTalk() {
   if (!track || !wrap || !canvas) return;
 
   const SRC   = new URL('../img/image-face.webp', import.meta.url).href;
-  const GRID   = 260;   // 67.600 candidatos -> ~28.000 particulas
-  const SCALE  = 1.38;  // tamaño en unidades de mundo
+  // Menos densidad en mobile: 28.000 particulas con shader propio es mucho
+  // para un telefono, y a ese tamaño de pantalla el detalle no se aprecia.
+  const GRID   = isMobile() ? 170 : 260;
+  // Mas chico en mobile: a 1.38 el rostro ocupaba casi toda la pantalla y se
+  // montaba sobre los botones de pregunta.
+  const SCALE  = isMobile() ? 0.88 : 1.38;
   const BASE_H = 900;   // alto de viewport de referencia para el tamaño de punto
   const PT     = 14.5;  // tamaño base del punto (fase dispersa)
   const FACE_SCALE = 0.35;  // factor al armarse la cara — 1 = igual que disperso
@@ -1722,6 +1776,9 @@ function setupLetsTalk() {
       camera.updateProjectionMatrix();
       uniforms.uSize.value = PT * dpr * (r.height / BASE_H);
 
+      // En mobile sube: el chat vive en la mitad de abajo de la pantalla
+      points.position.y = isMobile() ? 0.72 : 0;
+
       // Medio viewport en unidades de mundo: las dispersas tienen que llegar
       // a los bordes de la pantalla, no a una caja fija.
       const visH = 2 * Math.tan((45 * Math.PI / 180) / 2) * camera.position.z;
@@ -1754,8 +1811,10 @@ function setupLetsTalk() {
       .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
     // ── La cara mira al cursor ──
-    const MAX_YAW   = 0.42;   // ~24 grados a los costados
-    const MAX_PITCH = 0.26;   // ~15 grados arriba/abajo
+    // Con el telefono en la mano es facil pasarse de giro, asi que los topes
+    // son mas cortos que con el mouse.
+    const MAX_YAW   = isTouch() ? 0.28 : 0.42;   // ~16 / ~24 grados
+    const MAX_PITCH = isTouch() ? 0.17 : 0.26;   // ~10 / ~15 grados
     const EYE_X     = 0.030;  // cuanto viaja la pupila (unidades de mundo)
     const EYE_Y     = 0.020;  // vertical siempre menos que horizontal
     let tarYaw = 0, tarPitch = 0, yaw = 0, pitch = 0;
@@ -1774,6 +1833,14 @@ function setupLetsTalk() {
       // Y de pantalla crece hacia abajo, el de mundo hacia arriba: se invierte
       tarEyeX  =  cl(nx) * EYE_X;
       tarEyeY  = -cl(ny) * EYE_Y;
+    });
+
+    // En mobile las mismas cuatro variables las escribe el giroscopio
+    setupTilt(wrap, (nx, ny) => {
+      tarYaw   =  nx * MAX_YAW;
+      tarPitch =  ny * MAX_PITCH;
+      tarEyeX  =  nx * EYE_X;
+      tarEyeY  = -ny * EYE_Y;
     });
 
     let mx = 99, my = 99;

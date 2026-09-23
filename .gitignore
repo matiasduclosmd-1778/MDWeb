@@ -4,3 +4,7 @@ node_modules/
 .agents/
 skills-lock.json
 dist/
+
+# Experimentos sueltos, no van al repo
+accessibility.html
+scramble.html

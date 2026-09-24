@@ -8,6 +8,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/jpeg" href="img/ico.jpg" />
+  <!-- El tema guardado se aplica antes de pintar: desde main.js llegaria tarde
+       y la intro arrancaria en claro para despues saltar a oscuro -->
+  <script>
+    try { if (localStorage.getItem('mdweb-theme') === 'dark') document.documentElement.classList.add('dark'); } catch (e) {}
+  </script>
   <link rel="stylesheet" href="css/style.css" />
   <link href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css" rel="stylesheet" />
 </head>
@@ -27,8 +32,8 @@
   <!-- ═══════════════════════════════════════
        MATIMENU — About / bio panel
   ════════════════════════════════════════ -->
-  <aside id="matiMenu">
-    <button class="panel-close" id="panelClose"><i class="ri-close-line"></i></button>
+  <aside id="matiMenu" data-lenis-prevent>
+    <button class="panel-close" id="panelClose" aria-label="Close"><i class="ri-close-line"></i></button>
 
     <div class="panel-name">
       <span>Mati</span>
@@ -85,13 +90,13 @@
       <h4 class="panel-section-title" data-i18n="panel.contact">Contact</h4>
       <a href="mailto:matiasduclosmd@gmail.com" class="panel-link">matiasduclosmd@gmail.com</a>
       <div class="panel-socials">
-        <a href="https://www.linkedin.com/in/matias-duclos-bb9a09140/" class="panel-social-link" target="_blank">
+        <a href="https://www.linkedin.com/in/matias-duclos-bb9a09140/" class="panel-social-link" target="_blank" rel="noopener">
           <i class="ri-linkedin-fill"></i><span>LinkedIn</span>
         </a>
-        <a href="https://www.instagram.com/1778studio/" class="panel-social-link" target="_blank">
+        <a href="https://www.instagram.com/1778studio/" class="panel-social-link" target="_blank" rel="noopener">
           <i class="ri-instagram-fill"></i><span>Instagram</span>
         </a>
-        <a href="https://x.com/matiduclos" class="panel-social-link" target="_blank">
+        <a href="https://x.com/matiduclos" class="panel-social-link" target="_blank" rel="noopener">
           <i class="ri-twitter-x-fill"></i><span>X</span>
         </a>
       </div>
@@ -154,7 +159,7 @@
         <div class="nav-contact-wrap" id="navContactWrap">
           <a class="nav-contact" href="https://wa.link/sz7l4n" target="_blank" rel="noopener" data-magnetic data-i18n="nav.contact">Contact me</a>
         </div>
-        <button class="nav-switch" id="darkToggle" data-magnetic>
+        <button class="nav-switch" id="darkToggle" data-magnetic aria-label="Dark mode" aria-pressed="false">
           <span class="switch-label"></span>
           <span class="switch-track"></span>
         </button>
@@ -259,7 +264,7 @@
 
         <!-- Chat con el rostro. Aparece con la cara armada. -->
         <div class="lt-chat" id="ltChat" aria-hidden="true">
-          <div class="lt-log" id="ltLog" role="log" aria-live="polite" aria-atomic="false"></div>
+          <div class="lt-log" id="ltLog" data-lenis-prevent role="log" aria-live="polite" aria-atomic="false"></div>
           <div class="lt-chips" id="ltChips"></div>
           <form class="lt-form" id="ltForm" autocomplete="off">
             <input class="lt-input" id="ltInput" type="text" tabindex="-1"

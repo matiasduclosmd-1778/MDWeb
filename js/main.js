@@ -255,9 +255,12 @@ document.fonts.ready.then(() => {
 
   // Lo que ya quedo escrito en el DOM no se reescribe solo
   onLangChange(() => {
-    // El hero se tipea letra por letra: al cambiar idioma se repone entero
-    if (heroTaglineEl && heroTaglineEl.textContent) heroTaglineEl.textContent = t('hero.msg');
-    if (heroParaEl && heroParaEl.textContent)       heroParaEl.textContent   = PARA_TEXT();
+    // Lo ya tipeado se repone entero; lo que se esta tipeando sigue solo en el
+    // idioma nuevo (typeHero relee el texto en cada letra)
+    if (heroTyped.msg)  heroTaglineEl.textContent = t('hero.msg');
+    if (heroTyped.para) heroParaEl.textContent    = PARA_TEXT();
+    // El parrafo cambia de largo con el idioma: el alto reservado tambien
+    reserveHeroPara();
     // "Manifesto" y "Manifiesto" no miden lo mismo: hay que recalcular el cuerpo
     // que hace que la palabra llegue a los bordes
     if (mfHead) measureManifesto();
@@ -330,10 +333,16 @@ function setupCursor() {
     cursorY = e.clientY;
   });
 
-  // Hover: scale up
-  document.querySelectorAll('a, button, [data-magnetic], .work-link').forEach(el => {
-    el.addEventListener('mouseenter', () => document.body.classList.add('cur-hover'));
-    el.addEventListener('mouseleave', () => document.body.classList.remove('cur-hover'));
+  // Hover: scale up. Delegado y no por elemento: los chips del chat se crean
+  // despues de esto y con listeners sueltos nunca agrandaban el cursor.
+  const HOVERABLE = 'a, button, [data-magnetic], .work-link';
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest && e.target.closest(HOVERABLE);
+    if (el && !el.disabled) document.body.classList.add('cur-hover');
+  });
+  document.addEventListener('mouseout', e => {
+    const el = e.target.closest && e.target.closest(HOVERABLE);
+    if (el && !el.contains(e.relatedTarget)) document.body.classList.remove('cur-hover');
   });
 
   // Click: swap face
@@ -369,11 +378,23 @@ function splitAndAnimateHeadline() {
     el.appendChild(clip);
   });
 
-  // Pre-reserva altura final para que el flex layout no se mueva durante el typing
+  reserveHeroPara();
+  let rz = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rz);
+    rz = setTimeout(reserveHeroPara, 150);
+  });
+}
+
+// Pre-reserva la altura final para que el flex layout no se mueva durante el
+// typing. Se rehace al redimensionar y al cambiar de idioma: con el alto viejo
+// el parrafo se montaba sobre los botones o dejaba un hueco.
+function reserveHeroPara() {
+  const typed = heroParaEl.textContent;
+  heroParaWrapEl.style.minHeight = '0px';
   heroParaEl.textContent = PARA_TEXT();
   heroParaWrapEl.style.minHeight = heroParaWrapEl.getBoundingClientRect().height + 'px';
-  heroParaEl.textContent = '';
-
+  heroParaEl.textContent = typed;
 }
 
 
@@ -592,6 +613,8 @@ const HERO_FADE = () => window.innerHeight * 0.85;
 const navbarEl    = document.querySelector('.navbar');
 const sectionNavEl = document.getElementById('sectionNav');
 
+const heroInert = { btns: false, head: false };
+
 function updateHeadline(progress) {
   const wt      = smoothstep(Math.min(1, progress / 0.55));
   const weight  = Math.round(lerp(900, 100, wt));
@@ -605,6 +628,20 @@ function updateHeadline(progress) {
 
   const btnOt = smoothstep(Math.max(0, Math.min(1, (progress - 0.25) / 0.30)));
   heroBtnsEl.style.opacity = 1 - btnOt;
+
+  // Invisibles tambien tienen que ser inertes: el spacer que scrollea encima
+  // deja pasar los clics, y los botones ya desvanecidos seguian abriendo links
+  // (y el titular seguia cambiando el cursor)
+  const btnsOff = btnOt > 0.95, headOff = opacity < 0.05;
+  if (btnsOff !== heroInert.btns) {
+    heroInert.btns = btnsOff;
+    heroBtnsEl.style.pointerEvents = btnsOff ? 'none' : '';
+  }
+  if (headOff !== heroInert.head) {
+    heroInert.head = headOff;
+    headlineWrapEl.style.pointerEvents = headOff ? 'none' : '';
+    if (headOff) document.body.classList.remove('cur-headline', 'cur-hover');
+  }
 
   // El contacto sube al nav cuando el boton del hero ya termino de irse
   if (navContactEl) {
@@ -964,7 +1001,7 @@ function setupManifesto() {
   }
 
   let draftText = draft ? pick(draft, 'text') : '';
-  let typed = false;
+  let typed = false, draftDone = false;
   function typeDraft() {
     if (typed || !draft || !draftEl) return;
     typed = true;
@@ -972,11 +1009,13 @@ function setupManifesto() {
     (function step() {
       if (i >= draftText.length) {
         // El cursor sigue titilando: el mensaje esta escrito pero sin enviar
+        draftDone = true;
         if (composer) composer.classList.add('ready');
         return;
       }
+      // Prefijo y no +=: si cambia el idioma a mitad, sigue en el nuevo
       const ch = draftText[i++];
-      draftEl.textContent += ch;
+      draftEl.textContent = draftText.slice(0, i);
       setTimeout(step, ch === ' ' ? 26 : 42);
     })();
   }
@@ -1050,16 +1089,12 @@ function setupManifesto() {
       if (body && el._msg) body.textContent = pick(el._msg, 'text');
     });
     draftText = draft ? pick(draft, 'text') : '';
-    if (draftEl && typed) {           // ya estaba escrito: se repone entero
+    if (draftEl && draftDone) {       // ya estaba escrito: se repone entero
       draftEl.textContent = draftText;
     }
   });
 
-  let rz = null;
-  window.addEventListener('resize', () => {
-    clearTimeout(rz);
-    rz = setTimeout(measureManifesto, 200);
-  });
+  onLayout(measureManifesto);
 }
 
 function measureManifesto() {
@@ -1110,15 +1145,18 @@ function updateManifesto() {
   mfHead.lastT = t;
   mfHead.lastE = e;
   const big = mfHead.bigFs || window.innerWidth * 0.13;
+  // En mobile el rotulo final es mas chico: a 50px ocupaba todo el ancho y
+  // quedaba debajo de los botones del nav
+  const end = isMobile() ? 30 : 50;
   const st  = mfHead.title.style;
-  st.fontSize      = lerp(big, 50, t).toFixed(2) + 'px';
+  st.fontSize      = lerp(big, end, t).toFixed(2) + 'px';
   // Invertido respecto al hero: alla el titular va de 900 a 100 al scrollear;
   // aca la palabra entra fina y se va engrosando mientras se achica.
   st.fontWeight    = Math.round(lerp(200, 800, e));
   // El tracking en px, no en em: en em cambiaria solo por achicarse el cuerpo
   // Menos tracking negativo al arrancar: con peso 200 las letras son finitas
   // y el -0.04em las empastaba una contra otra.
-  st.letterSpacing = lerp(big * -0.02, 2.42, t).toFixed(2) + 'px';
+  st.letterSpacing = lerp(big * -0.02, 2.42 * end / 50, t).toFixed(2) + 'px';
   st.opacity       = lerp(1, 0.40, t).toFixed(3);
 }
 
@@ -1130,6 +1168,7 @@ function setupBubbleDrop() {
   const thread   = document.getElementById('mfThread');
   const composer = document.getElementById('mfComposer');
   if (!sec || !thread) return null;
+  const wrap = thread.parentElement;   // .mf-wrap: hilo + composer
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
   // En touch no: la fisica usa position fixed, y con la barra del navegador
   // entrando y saliendo el piso se mueve debajo de las burbujas.
@@ -1149,12 +1188,13 @@ function setupBubbleDrop() {
 
     // Medir TODO antes de sacar nada del flujo, o las medidas salen mal
     const rects = els.map(el => el.getBoundingClientRect());
-    const keepH = thread.offsetHeight;
+    const keepH = wrap.offsetHeight;
     dropped = true;
 
-    // Reservar el alto: sin esto la seccion colapsa y el scroll pega un salto
-    thread.style.height = keepH + 'px';
-    if (composer) composer.style.marginTop = '0';
+    // Reservar el alto: sin esto la seccion colapsa y el scroll pega un salto.
+    // Del wrap y no del hilo: el composer vive afuera del hilo, y reservando
+    // solo el hilo se perdian su alto y su margen (~100px de salto en Works).
+    wrap.style.height = keepH + 'px';
 
     bodies = els.map((el, i) => {
       const r = rects[i];
@@ -1182,8 +1222,7 @@ function setupBubbleDrop() {
     dropped = false;
     if (raf) cancelAnimationFrame(raf);
     raf = null;
-    thread.style.height = '';
-    if (composer) composer.style.marginTop = '';
+    wrap.style.height = '';
     (bodies || []).forEach(b => {
       b.el.classList.remove('mf-falling');
       b.el.style.left = b.el.style.top = b.el.style.width = b.el.style.transform = '';
@@ -1265,11 +1304,7 @@ function setupBubbleDrop() {
     secH   = sec.offsetHeight;
   }
   measure();
-  let mrz = null;
-  window.addEventListener('resize', () => {
-    clearTimeout(mrz);
-    mrz = setTimeout(measure, 200);
-  });
+  onLayout(measure);
 
   // Se devuelve el chequeo para engancharlo al tick que ya existe
   return function update() {
@@ -1411,8 +1446,12 @@ function setupClients() {
     });
   }
 
-  let t = null;
+  // Solo si cambia el ancho: en mobile la barra de direcciones dispara resize
+  // en cada scroll (cambia el alto), y rearmar la cinta ahi es trabajo tirado
+  let t = null, lastW = window.innerWidth;
   window.addEventListener('resize', () => {
+    if (window.innerWidth === lastW) return;
+    lastW = window.innerWidth;
     clearTimeout(t);
     t = setTimeout(build, 180);
   });
@@ -1765,7 +1804,7 @@ function setupLetsTalk() {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setClearAlpha(0);
 
-    let trackTop = 0, trackLen = 1;
+    let trackTop = 0, trackLen = 1, faceOffX = 0;
 
     function resize() {
       const r = wrap.getBoundingClientRect();
@@ -1776,26 +1815,37 @@ function setupLetsTalk() {
       camera.updateProjectionMatrix();
       uniforms.uSize.value = PT * dpr * (r.height / BASE_H);
 
-      // En mobile sube: el chat vive en la mitad de abajo de la pantalla
-      points.position.y = isMobile() ? 0.72 : 0;
-
       // Medio viewport en unidades de mundo: las dispersas tienen que llegar
       // a los bordes de la pantalla, no a una caja fija.
       const visH = 2 * Math.tan((45 * Math.PI / 180) / 2) * camera.position.z;
+
+      // Donde vive el chat decide donde va la cara. Mobile parado: el chat
+      // ocupa la mitad de abajo y la cara sube. Telefono acostado: el chat va
+      // a la derecha (ver CSS) y la cara se corre a la izquierda, pero solo
+      // mientras es cara (faceOffX se escala por faceness en el loop): el
+      // texto y el disperso siguen centrados.
+      const shortLand = r.height <= 500 && r.width > r.height && r.width <= 1024;
+      points.position.y = isMobile() && !shortLand ? 0.72 : 0;
+      faceOffX = shortLand ? -visH * camera.aspect * 0.22 : 0;
       uniforms.uSpread.value.set(visH * camera.aspect * 0.52, visH * 0.52);
 
       // El texto ocupa el 74% del ancho, pero sin pasarse de alto en pantallas
       // angostas (aText conserva la proporcion, asi que basta con el ancho)
       const visW = visH * camera.aspect;
       uniforms.uTextW.value = Math.min(visW * 0.37, visH * 1.30);
+    }
 
-      // Recorrido del pinned, medido aca y no por frame
+    // Recorrido del pinned, medido aca y no por frame. Aparte del resize: el
+    // track se corre cada vez que cambia el alto de lo que tiene arriba.
+    function measureTrack() {
       const tr = track.getBoundingClientRect();
       trackTop = tr.top + window.scrollY;
       trackLen = Math.max(1, track.offsetHeight - window.innerHeight);
     }
     resize();
+    measureTrack();
     window.addEventListener('resize', resize);
+    onLayout(measureTrack);
 
     // En claro la tinta oscura dibuja; en oscuro dibuja la luz. Hay que invertir
     // el tono o el retrato sale en negativo.
@@ -1907,6 +1957,7 @@ function setupLetsTalk() {
       ue.x += (tarEyeX - ue.x) * 0.13;
       ue.y += (tarEyeY - ue.y) * 0.13;
 
+      points.position.x = faceOffX * faceness;
       points.rotation.y = yaw   * faceness + Math.sin(time * 0.20) * 0.020;
       points.rotation.x = pitch * faceness + Math.sin(time * 0.15) * 0.015;
 
@@ -1998,9 +2049,16 @@ function setupLetsTalkChat({ wrap, uniforms, faceness }) {
   }
 
   // Escribe la respuesta letra por letra y mueve la boca con el mismo reloj
+  // Mientras habla no se puede preguntar: sin esto los chips seguian activos
+  // y el clic se perdia sin ninguna señal
+  function busy(on) {
+    speaking = on;
+    if (send) send.disabled = on;
+    [...chips.children].forEach(b => { b.disabled = on; });
+  }
+
   function speak(text) {
-    speaking = true;
-    if (send) send.disabled = true;
+    busy(true);
     const el = bubble('', 'face');
     let i = 0;
     const MS = 42;
@@ -2008,8 +2066,7 @@ function setupLetsTalkChat({ wrap, uniforms, faceness }) {
     (function step() {
       if (i >= text.length) {
         mouthTarget = 0;
-        speaking = false;
-        if (send) send.disabled = false;
+        busy(false);
         return;
       }
       const ch = text[i++];
@@ -2034,6 +2091,7 @@ function setupLetsTalkChat({ wrap, uniforms, faceness }) {
     if (speaking || !q.trim()) return;
     bubble(q.trim(), 'me');
     input.value = '';
+    busy(true);   // ya ocupado durante la pausa, no recien al hablar
     // Pausa corta: el rostro "piensa" antes de contestar
     setTimeout(() => speak(answerFor(q)), 420);
   }
@@ -2080,11 +2138,24 @@ function setupLetsTalkChat({ wrap, uniforms, faceness }) {
   };
 }
 
-let _snapRz = null;
-window.addEventListener('resize', () => {
-  clearTimeout(_snapRz);
-  _snapRz = setTimeout(buildSnapPoints, 200);
-});
+// ─── MEDIDAS DE LAYOUT ───────────────────────────────────────────────────────
+// Varias partes cachean posiciones absolutas (snap, manifiesto, caida, Let's
+// Talk). Medirlas solo en resize no alcanza: el alto del contenido cambia solo
+// —las respuestas de la AI crecen al aparecer, el idioma cambia el largo de los
+// textos— y todo lo de abajo se corria sin que nadie se enterara. El snap caia
+// ~60px corrido y las fases de Let's Talk arrancaban antes de tiempo.
+const layoutListeners = [];
+function onLayout(fn) { layoutListeners.push(fn); }
+let _layoutT = null;
+function relayout() {
+  clearTimeout(_layoutT);
+  _layoutT = setTimeout(() => layoutListeners.forEach(fn => fn()), 150);
+}
+window.addEventListener('resize', relayout);
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(relayout).observe(scrollContentEl);
+}
+onLayout(buildSnapPoints);
 
 // ─── MAGNETIC EFFECT ─────────────────────────────────────────────────────────
 function setupMagnetic() {
@@ -2156,10 +2227,15 @@ function openPanel() {
   // lista se queda quieta mientras el hero se corre.
   gsap.to([stageEl, scrollContentEl, chromeEl], { x: pw, duration: 0.72, ease: 'expo.out' });
 
-  // Contenido entra junto con el panel, sin delays grandes
-  gsap.from('.panel-name span', { x: -16, opacity: 0, duration: 0.55, stagger: 0.06, delay: 0.05, ease: 'power3.out' });
-  gsap.from('.panel-tag',       { opacity: 0, duration: 0.35, stagger: 0.03, delay: 0.12, ease: 'power2.out' });
-  gsap.from('.panel-section',   { x: -12, opacity: 0, duration: 0.45, stagger: 0.05, delay: 0.1, ease: 'power3.out' });
+  // Contenido entra junto con el panel, sin delays grandes.
+  // fromTo + overwrite y no from(): con from(), abrir de nuevo antes de que
+  // terminara la entrada anterior tomaba la opacidad a medias como destino y
+  // el contenido quedaba semitransparente (o invisible) para siempre.
+  const inT = { overwrite: true };
+  matiMenuEl.scrollTop = 0;
+  gsap.fromTo('.panel-name span', { x: -16, opacity: 0 }, { x: 0, opacity: 1, duration: 0.55, stagger: 0.06, delay: 0.05, ease: 'power3.out', ...inT });
+  gsap.fromTo('.panel-tag',       { opacity: 0 },         { opacity: 1, duration: 0.35, stagger: 0.03, delay: 0.12, ease: 'power2.out', ...inT });
+  gsap.fromTo('.panel-section',   { x: -12, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, stagger: 0.05, delay: 0.1, ease: 'power3.out', ...inT });
 }
 
 function closePanel() {
@@ -2192,6 +2268,12 @@ function setupPanel() {
     matiMenuEl.addEventListener('click', () => { if (!isPanelOpen) openPanel(); });
   }
 
+  // El ancho del panel cambia por breakpoint (y en mobile es el viewport): si
+  // se rota o redimensiona con el panel abierto, el stage queda corrido mal
+  window.addEventListener('resize', () => {
+    if (isPanelOpen && !panelBusy) gsap.set([stageEl, scrollContentEl, chromeEl], { x: getPanelW() });
+  });
+
   stageEl.addEventListener('click', () => { if (isPanelOpen) closePanel(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && isPanelOpen) closePanel(); });
 }
@@ -2199,8 +2281,19 @@ function setupPanel() {
 
 // ─── DARK MODE ───────────────────────────────────────────────────────────────
 function setupDarkMode() {
-  document.getElementById('darkToggle').addEventListener('click', () => {
+  const btn = document.getElementById('darkToggle');
+
+  // La clase ya la puso el script del <head> si habia tema guardado: aca se
+  // alinea el resto sin animar (el fondo tiene que arrancar oscuro, no fundirse)
+  isDark = document.documentElement.classList.contains('dark');
+  btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+  if (threeState.uniforms) threeState.uniforms.uDark.value = isDark ? 1 : 0;
+
+  btn.addEventListener('click', () => {
     isDark = document.documentElement.classList.toggle('dark');
+    // En mobile el rotulo se oculta: el estado tiene que quedar en el boton
+    btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+    try { localStorage.setItem('mdweb-theme', isDark ? 'dark' : 'light'); } catch (e) { /* modo privado */ }
     gsap.to(threeState.uniforms.uDark, {
       value: isDark ? 1 : 0,
       duration: 0.9,
@@ -2211,11 +2304,15 @@ function setupDarkMode() {
 
 // ─── CLOCK ───────────────────────────────────────────────────────────────────
 function setupClock() {
-  function clockTick() {
-    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
-    const p = n => String(n).padStart(2, '0');
-    document.getElementById('clock').textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-  }
+  // Intl formatea directo en la zona de Buenos Aires. Antes se armaba un Date
+  // parseando el string de toLocaleString, y ese parseo no esta garantizado
+  // entre navegadores (Safari puede devolver Invalid Date -> "NaN:NaN:NaN").
+  const el  = document.getElementById('clock');
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  function clockTick() { el.textContent = fmt.format(new Date()); }
   clockTick();
   setInterval(clockTick, 1000);
 }
@@ -2384,29 +2481,8 @@ function setupIntro() {
 
       // Typing — arranca al mismo tiempo que el fade
       setTimeout(() => {
-        // Tagline "Hi, this is my"
-        const MSG  = t('hero.msg');
-        const para = PARA_TEXT();
-        heroTaglineEl.classList.add('typing');
-        let ti = 0;
-        const tiv = setInterval(() => {
-          heroTaglineEl.textContent += MSG[ti++];
-          if (ti >= MSG.length) {
-            clearInterval(tiv);
-            setTimeout(() => heroTaglineEl.classList.remove('typing'), 650);
-          }
-        }, 52);
-
-        // Párrafo
-        heroParaEl.classList.add('typing');
-        let pi = 0;
-        const piv = setInterval(() => {
-          heroParaEl.textContent += para[pi++];
-          if (pi >= para.length) {
-            clearInterval(piv);
-            setTimeout(() => heroParaEl.classList.remove('typing'), 650);
-          }
-        }, 52);
+        typeHero(heroTaglineEl, () => t('hero.msg'), 'msg');   // "Hi, this is my"
+        typeHero(heroParaEl,    PARA_TEXT,          'para');
       }, D * 1000);
     },
   });
@@ -2429,6 +2505,25 @@ function setupIntro() {
       .to(creative, { x: cDX, duration: 0.85, ease: 'expo.inOut' }, 1.0)
       .to(lab,      { x: lDX, duration: 0.85, ease: 'expo.inOut' }, 1.0);
   }
+}
+
+// Tipea de a una letra. El texto se vuelve a pedir en cada paso y se escribe
+// como un prefijo, no sumando letras: si cambian el idioma a mitad de camino,
+// sigue en el idioma nuevo en vez de pegar el resto del viejo.
+const heroTyped = { msg: false, para: false };
+
+function typeHero(el, text, key) {
+  el.classList.add('typing');
+  let i = 0;
+  const iv = setInterval(() => {
+    const full = text();
+    el.textContent = full.slice(0, ++i);
+    if (i >= full.length) {
+      clearInterval(iv);
+      heroTyped[key] = true;
+      setTimeout(() => el.classList.remove('typing'), 650);
+    }
+  }, 52);
 }
 
 // ─── HEADLINE WEIGHT HOVER ───────────────────────────────────────────────────
@@ -2547,6 +2642,9 @@ function setupDitherReveal() {
   let time = 0;
 
   function draw() {
+    // Se agenda primero: el corte de abajo saltea el pintado, no el loop. Antes
+    // el return mataba el rAF y al volver al hero el rastro no aparecia nunca mas.
+    requestAnimationFrame(draw);
     time += 0.055;
 
     // Softer lerp → smoother, more fluid cursor feel
@@ -2596,8 +2694,6 @@ function setupDitherReveal() {
         }
       }
     }
-
-    requestAnimationFrame(draw);
   }
 
   requestAnimationFrame(draw);

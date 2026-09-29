@@ -372,12 +372,10 @@ body.cur-headline .cursor-face { mix-blend-mode: difference; filter: invert(1); 
   transition: color var(--t);
 }
 
-.switch-label::after {
-  content: 'Dark mode';
-}
-html.dark .switch-label::after {
-  content: 'Light mode';
-}
+/* Texto real y no ::after: el roll de letras necesita nodos para partir */
+.sl-light { display: none; }
+html.dark .sl-dark  { display: none; }
+html.dark .sl-light { display: inline; }
 
 .switch-track {
   position: relative;
@@ -704,8 +702,21 @@ html.dark .client-logo {
 .mf-bg {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  /* clip y no hidden: hidden lo vuelve contenedor de scroll y el canvas sticky
+     de adentro deja de pegarse al viewport */
+  overflow: clip;
   pointer-events: none;
+}
+/* Con webgl andando la seccion arranca transparente: el gradiente aparece solo
+   donde pasan los trazos. El fondo sube una pantalla para pintar sobre el hero. */
+.manifesto.mf-painted { background: transparent; }
+.manifesto.mf-painted .mf-bg { top: -100vh; }
+/* El canvas mide una pantalla y acompaña al scroll: pegado arriba mientras dura
+   el fondo. Renderizar la seccion entera a resolucion completa no tiene sentido. */
+.mf-stick {
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
 .mf-shader {
   position: absolute;
@@ -721,35 +732,65 @@ html.dark .client-logo {
   max-width: 940px;
   margin: 0 auto;
   padding-top: 2vh;
+  /* Camara: el JS mueve el origen al centro de la pantalla */
+  perspective: 1100px;
 }
-/* El track define cuanto scroll dura el encogido.
-   Margen negativo para escapar del padding lateral de la seccion: el titulo
-   grande va a sangre, de borde a borde. */
+/* Durante la caida no: perspective vuelve al wrap contenedor de los position
+   fixed, y las burbujas caerian relativas a el y no a la pantalla */
+.mf-wrap:has(.mf-falling) { perspective: none; }
+.mf-falling { translate: none !important; rotate: none !important; }
+/* La palabra ocupa una pantalla y queda fija mientras dura el track: da tiempo
+   a que se dibuje y a pasarle el mouse antes de que suba la charla.
+   El track arranca una pantalla antes que la seccion (top -100vh) para que la
+   palabra ya este centrada mientras entra el gradiente: se dibuja a mitad de la
+   entrada. El margin-bottom negativo devuelve esa pantalla al flujo, asi la
+   charla queda donde estaba. Margin-top negativo no sirve: colapsa con el de la
+   seccion y la correria entera. */
 .mf-head {
-  /* El hueco entre el titulo y el texto = este alto menos el recorrido del
-     encogido (0.55vh en el JS). Mantenerlos cerca o vuelve a abrirse. */
-  height: 68vh;
-  margin: 0 -6vw;
-  padding: 0 2vw;
+  top: -100vh;
+  height: 250vh;
+  margin: 0 -6vw -100vh;
+  /* Tapa el hero mientras entra: sin esto se come los clics de los botones */
+  pointer-events: none;
 }
 .mf-head-inner {
   position: sticky;
-  top: 1vh;
-  /* Alto automatico, NO 100vh: con el inner de una pantalla entera, al soltarse
-     el sticky quedaban ~94vh de vacio entre el titulo y el texto. */
+  top: 0;
+  height: 100vh;
   display: flex;
-  justify-content: center;  /* centrado horizontal: se achica sin correrse */
-  text-align: center;
+  align-items: center;
+  justify-content: center;
+  perspective: 1100px;      /* camara: la palabra gira apenas con el mouse */
 }
-/* Arranca en el estado grande: si el JS no corriera, se ve igual el titulo.
-   El ancho se calcula para que las 10 letras llenen la caja (mono ~0.6em). */
+/* Medido en la referencia: 57% del ancho, centro vertical al 54% */
+.mf-word {
+  width: 57vw;
+  height: auto;
+  overflow: visible;
+  transform: translateY(4vh);
+}
+/* Toma el mouse recien cuando esta dibujada: antes estaria sobre el hero */
+.mf-word.is-live { pointer-events: auto; }
+.mf-nodes rect {
+  fill: #FFF0D9;
+  stroke: #463F3A;          /* mismo gris topo que MF_INK en el JS */
+}
+/* Respaldo si la fuente vectorial no carga: el texto con la misma caligrafia */
 .mf-title {
-  font-size: 13vw;          /* aproximado: el JS lo recalcula midiendo el texto */
-  font-weight: 200;         /* entra fina y engorda al achicarse */
-  line-height: 0.9;
-  letter-spacing: -0.04em;
-  text-transform: uppercase;
-  color: #2A1C14;
+  font-family: 'Mrs Sheppards', cursive;
+  font-weight: 400;
+  font-size: 12vw;
+  line-height: 1;
+  color: #463F3A;
+  white-space: nowrap;
+  transform: translateY(4vh);
+}
+/* Con el SVG armado, el h2 sigue para lectores de pantalla pero no se ve */
+.mf-title--sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 /* ── El hilo ── */
@@ -1015,10 +1056,8 @@ html.dark .client-logo {
 
 @media (max-width: 767px) {
   .manifesto { padding: 0 6vw 16vh; }
-  .mf-head { height: 72vh; }
-  /* Se pega debajo del nav y no detras: el rotulo quedaba tapado por los
-     botones (el nav mobile mide ~62px) */
-  .mf-head-inner { top: 66px; }
+  .mf-head { height: 230vh; }
+  .mf-word { width: 86vw; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -1588,3 +1627,25 @@ html.dark .client-logo {
   #matiMenu   { width: 420px; }
   .panel-name span { font-size: clamp(28px, 4vw, 40px); }
 }
+
+/* ─── ROLL DE LETRAS ──────────────────────────────────────────────────────────
+   Cada letra es una ranura con overflow: clip. La copia que entra desde abajo
+   es un text-shadow desplazado exactamente un alto de ranura (1lh + padding).
+   El padding deja lugar a descendentes y acentos; el margen negativo lo
+   compensa para que el renglon no cambie de alto. */
+.rl-w { white-space: nowrap; }
+.rl {
+  display: inline-block;
+  overflow: clip;
+  vertical-align: top;
+  padding-block: 0.15em;
+  margin-block: -0.15em;
+}
+.rl-i {
+  display: inline-block;
+  text-shadow: 0 calc(1lh + 0.3em) 0 currentColor;
+  will-change: transform;
+}
+/* Texto vertical: la letra va de costado y su "abajo" queda a la izquierda */
+.rl-v .rl-i { text-shadow: calc(-1lh - 0.3em) 0 0 currentColor; }
+

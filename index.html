@@ -7,6 +7,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+  <!-- Solo para el texto de respaldo del titulo: la palabra se dibuja con los
+       contornos del .ttf en fonts/ (Google Fonts sirve woff2 y opentype.js no lo lee) -->
+  <link href="https://fonts.googleapis.com/css2?family=Mrs+Sheppards&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/jpeg" href="img/ico.jpg" />
   <!-- El tema guardado se aplica antes de pintar: desde main.js llegaria tarde
        y la intro arrancaria en claro para despues saltar a oscuro -->
@@ -160,7 +163,7 @@
           <a class="nav-contact" href="https://wa.link/sz7l4n" target="_blank" rel="noopener" data-magnetic data-i18n="nav.contact">Contact me</a>
         </div>
         <button class="nav-switch" id="darkToggle" data-magnetic aria-label="Dark mode" aria-pressed="false">
-          <span class="switch-label"></span>
+          <span class="switch-label"><span class="sl-dark">Dark mode</span><span class="sl-light">Light mode</span></span>
           <span class="switch-track"></span>
         </button>
       </div>
@@ -193,7 +196,8 @@
       <div class="mf-bg" aria-hidden="true">
       </div>
 
-      <!-- Tramo de entrada: la palabra se achica mientras dura este track -->
+      <!-- Pantalla de la palabra: queda fija mientras dura este track. El SVG lo
+           arma el JS con los contornos de la fuente; el h2 queda para lectores. -->
       <div class="mf-head" id="mfHead">
         <div class="mf-head-inner">
           <h2 class="mf-title" id="manifestoTitle" data-i18n="mf.title">Manifesto</h2>

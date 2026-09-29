@@ -2,9 +2,12 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { SplitText } from 'gsap/SplitText';
+import { CustomEase } from 'gsap/CustomEase';
 import Lenis from '@studio-freight/lenis';
+import opentype from 'opentype.js';
+import mrsSheppardsUrl from '../fonts/MrsSheppards-Regular.ttf?url';
 
-gsap.registerPlugin(SplitText);
+gsap.registerPlugin(SplitText, CustomEase);
 
 // ─── IDIOMA ──────────────────────────────────────────────────────────────────
 // Los textos viven en idiomas.txt, en la raiz, para poder editarlos sin tocar
@@ -239,11 +242,13 @@ document.fonts.ready.then(() => {
   setupWorks();
   setupClients();
   setupManifesto();
+  setupManifestoCamera();
   setupMeshGradient();
   mfDrop = setupBubbleDrop();
   buildSnapPoints();
   setupLetsTalk();
   setupMagnetic();
+  setupTextRoll();
   setupPanel();
   setupDarkMode();
   setupClock();
@@ -261,9 +266,6 @@ document.fonts.ready.then(() => {
     if (heroTyped.para) heroParaEl.textContent    = PARA_TEXT();
     // El parrafo cambia de largo con el idioma: el alto reservado tambien
     reserveHeroPara();
-    // "Manifesto" y "Manifiesto" no miden lo mismo: hay que recalcular el cuerpo
-    // que hace que la palabra llegue a los bordes
-    if (mfHead) measureManifesto();
   });
 });
 
@@ -671,10 +673,19 @@ function updateHeadline(progress) {
 // Mesh gradient por shader. Las manchas radiales de CSS no alcanzan: se mueven
 // como formas rigidas. Aca el color se pliega sobre si mismo (domain warping),
 // que es lo que hace que el gradiente parezca liquido.
-// Reusa el simplex/fbm que ya estaba escrito para el fondo del hero.
+//
+// Al entrar, el gradiente no aparece con un borde recto: sube pixelado, como
+// una lluvia de cuadrados de abajo hacia arriba. Los cuadrados se calculan en
+// el mismo shader, con su borde antialiasado: quedan limpios a cualquier escala.
 const MESH_FRAG = /* glsl */`
   uniform float uTime;
-  uniform float uDark;
+  uniform float uProg;       // entrada suavizada: 0 asomando abajo, 1 borde arriba
+  uniform float uFill;       // 1 = pantalla llena, se saltean los pixeles
+  uniform vec2  uRes;        // tamaño del canvas en px de dispositivo
+  uniform float uTopVh;      // top del canvas respecto del viewport, en vh
+  uniform float uCanH;       // alto del canvas, en vh (en mobile 100vh != innerHeight)
+  uniform float uSecOff;     // (scrollY - top de la seccion) / vh
+  uniform float uSecH;       // alto de la seccion, en vh
   varying vec2  vUv;
 
   vec3 mod289v3(vec3 x) { return x - floor(x*(1./289.))*289.; }
@@ -704,12 +715,6 @@ const MESH_FRAG = /* glsl */`
     return 130.*dot(m,g);
   }
 
-  float fbm(vec2 p) {
-    float v=0., a=.5, f=1.;
-    for(int i=0;i<4;i++) { v+=a*snoise(p*f); a*=.5; f*=2.; }
-    return v;
-  }
-
   // Perfil del radialGradient del SVG: opaco hasta el 23.1% del radio y lineal
   // hasta 0 en el borde. La y se corrige por el aspecto del viewBox.
   float blob(vec2 uv, vec2 c, float r) {
@@ -717,23 +722,85 @@ const MESH_FRAG = /* glsl */`
     return 1.0 - clamp((d / r - 0.231) / 0.769, 0.0, 1.0);
   }
 
-  void main() {
-    vec2 uv = vUv;
-    float t = uTime;
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
 
-    // Mesh de cuatro radiales sobre crema, igual que el SVG de referencia.
-    // El perfil del SVG es lineal: solido hasta 0.231 del radio y de ahi baja
-    // recto hasta 0. Los centros se mecen apenas para que el fondo respire.
+  // Tamaños medidos en la referencia: ~110px y ~67px sobre 1080 de alto. Se
+  // usan grande y la mitad para que encajen en la misma grilla.
+  const float BIG = 0.11;    // vh
+
+  // Cobertura de la lluvia de pixeles. x en vh; sy en vh desde el borde de la
+  // seccion (negativo = por encima).
+  float pixelRain(float x, float sy, float prog, float aa, float t) {
+    // Banda que va delante del borde: crece al entrar...
+    float band  = 0.60 * smoothstep(0.0, 0.45, prog);
+    // ...y un frente solido que completa la pantalla sobre el final
+    float solid = 0.40 * smoothstep(0.60, 0.95, prog);
+    float reachMax = solid + band;
+    if (-sy > reachMax + BIG) return 0.0;
+
+    // Tres niveles en la misma grilla: grande, mitad y cuarto. Cuanto mas
+    // arriba en la banda, mas se desarma en pixeles finos.
+    vec2  q    = vec2(x, sy);
+    vec2  bi   = floor(q / BIG);
+    float hb   = clamp(-(bi.y + 0.5) * BIG / max(band, 0.001), 0.0, 1.0);
+    float size = BIG;
+    vec2  id   = bi;
+    if (hash(bi + 17.3) < mix(0.30, 0.90, hb)) {
+      size *= 0.5;
+      id = floor(q / size);
+      if (hash(id + 41.9) < mix(-0.4, 0.8, hb)) {
+        size *= 0.5;
+        id = floor(q / size);
+      }
+    }
+    vec2  c  = (id + 0.5) * size;
+    float up = -c.y;                         // altura del centro sobre el borde
+    // Cada celda vuelve a tirar su suerte cada ~0.8s, desfasada de las demas:
+    // el borde de la lluvia titila aunque el scroll este quieto
+    float ph = hash(id + 3.3) * 8.0;
+    float r  = hash(id + size * 97.0 + floor(t * 1.25 + ph) * 13.1);
+
+    // Densidad que cae rapido desde la base (1 - sqrt): pocas celdas pegadas
+    // al borde y muchas sueltas flotando, como la referencia. La celda entra
+    // entera: si creciera con el scroll, al frenar quedarian motitas.
+    float reach = solid + band * (1.0 - r) * (1.0 - r);
+    if (up > reach) return 0.0;
+
+    // Medio pixel de mas: dos celdas vecinas se pisan y no queda la costura
+    // clara del antialias entre ellas
+    vec2 d = abs(q - c);
+    return clamp((size * 0.5 - max(d.x, d.y)) / aa + 1.0, 0.0, 1.0);
+  }
+
+  void main() {
+    float t = uTime;
+    // Todo en vh: ancho del viewport medido en altos
+    float aspect = uRes.x / uRes.y * uCanH;
+
+    // y en vh desde el borde superior del viewport
+    float vy = uTopVh + (1.0 - vUv.y) * uCanH;
+
+    // El uv del gradiente se sigue midiendo sobre la seccion entera: el degrade
+    // se ve igual que antes y por arriba simplemente se extiende.
+    vec2 uv = vec2(vUv.x, 1.0 - (vy + uSecOff) / uSecH);
+
+    // Domain warping suave: el color fluye en vez de solo desplazarse
+    vec2 w = vec2(snoise(uv * 1.4 + vec2(t * 0.07, 0.0)),
+                  snoise(uv * 1.4 + vec2(5.2, -t * 0.06)));
+    uv += w * 0.045;
+
     vec3 col = vec3(1.000, 0.941, 0.851);   // #FFF0D9
 
     // El radio del SVG es 1056 sobre 1600 de ancho, y la y va comprimida
     // (1000/1600 = 0.625) porque el preserveAspectRatio es "none".
     float R = 1056.0 / 1600.0;
 
-    vec2 cRosa = vec2(0.3337, 0.2177) + vec2(sin(t * 0.081) * 0.045, cos(t * 0.062) * 0.035);
-    vec2 cViol = vec2(0.7222, 0.3334) + vec2(cos(t * 0.069) * 0.050, sin(t * 0.094) * 0.038);
-    vec2 cAmba = vec2(0.7767, 0.7500) + vec2(sin(t * 0.057) * 0.048, cos(t * 0.078) * 0.032);
-    vec2 cCora = vec2(0.2622, 0.7095) + vec2(cos(t * 0.088) * 0.044, sin(t * 0.051) * 0.036);
+    vec2 cRosa = vec2(0.3337, 0.2177) + vec2(sin(t * 0.21) * 0.060, cos(t * 0.16) * 0.045);
+    vec2 cViol = vec2(0.7222, 0.3334) + vec2(cos(t * 0.18) * 0.065, sin(t * 0.24) * 0.050);
+    vec2 cAmba = vec2(0.7767, 0.7500) + vec2(sin(t * 0.15) * 0.062, cos(t * 0.20) * 0.042);
+    vec2 cCora = vec2(0.2622, 0.7095) + vec2(cos(t * 0.23) * 0.058, sin(t * 0.13) * 0.046);
 
     // Se pintan en el mismo orden que el SVG: rosa, violeta, ambar, coral
     col = mix(col, vec3(1.000, 0.365, 0.635), blob(uv, cRosa, R));
@@ -746,62 +813,132 @@ const MESH_FRAG = /* glsl */`
                             vec2(12.9898, 78.233))) * 43758.5453);
     col += (g - 0.5) * 0.0341;
 
-    gl_FragColor = vec4(col, 1.0);
+    // Dentro de la seccion, gradiente pleno. Por encima, la lluvia. La grilla
+    // va en coordenadas de la seccion: los pixeles suben pegados a ella.
+    float sy = vy + uSecOff;                 // vh desde el borde de la seccion
+    float m  = max(uFill, step(0.0, sy));
+    if (m < 1.0 && uProg > 0.0) {
+      float aa = uCanH / uRes.y;             // un pixel, en vh
+      m = max(m, pixelRain(vUv.x * aspect, sy, uProg, aa, t));
+    }
+
+    // Premultiplicado: es lo que espera el canvas con alpha
+    gl_FragColor = vec4(col * m, m);
   }
 `;
 
 function setupMeshGradient() {
   const host = document.querySelector('.mf-bg');
-  if (!host) return;
+  const sec  = document.getElementById('manifesto');
+  if (!host || !sec) return;
 
+  // El canvas mide una pantalla y va sticky dentro del fondo: renderizar la
+  // seccion entera a resolucion completa seria pintar pixeles que nadie ve.
+  const stick  = document.createElement('div');
+  stick.className = 'mf-stick';
   const canvas = document.createElement('canvas');
   canvas.className = 'mf-shader';
   canvas.setAttribute('aria-hidden', 'true');
-  host.prepend(canvas);
+  stick.appendChild(canvas);
+  host.prepend(stick);
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
   } catch (e) {
+    stick.remove();
     return;   // sin webgl queda el color plano de la seccion
   }
-  renderer.setPixelRatio(1);   // el ruido no necesita densidad: ahorra mucho
+  // Resolucion real: los bordes de los pixeles tienen que quedar limpios
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  // Con webgl andando la seccion arranca transparente y el fondo sobresale una
+  // pantalla hacia arriba: los pixeles caen encima del hero.
+  sec.classList.add('mf-painted');
+
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const scene    = new THREE.Scene();
   const camera   = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.z = 1;
 
-  const uniforms = { uTime: { value: 0 }, uDark: { value: 0 } };
+  const uniforms = {
+    uTime:   { value: 0 },
+    uProg:   { value: 0 },
+    uFill:   { value: REDUCED ? 1 : 0 },
+    uRes:    { value: new THREE.Vector2(1, 1) },
+    uTopVh:  { value: 0 },
+    uCanH:   { value: 1 },
+    uSecOff: { value: 0 },
+    uSecH:   { value: 1 },
+  };
   scene.add(new THREE.Mesh(
     new THREE.PlaneGeometry(2, 2),
     new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: MESH_FRAG })
   ));
 
-  // A mitad de resolucion: son 5 fbm por pixel, y a resolucion completa eso es
-  // 4 veces mas trabajo para un degrade que no tiene un solo borde duro.
-  // setSize(..., false) no toca el style, asi que el CSS lo estira al 100%.
-  const SCALE = 0.5;
+  let hostTop = 0, hostH = 0, secTop = 0, secH = 1, stickH = 1;
   function resize() {
-    const r = host.getBoundingClientRect();
-    if (r.width && r.height) {
-      renderer.setSize(Math.round(r.width * SCALE), Math.round(r.height * SCALE), false);
-    }
+    const r  = host.getBoundingClientRect();
+    const rs = sec.getBoundingClientRect();
+    // Se cachea: leer el rect en cada frame forzaria un reflow, porque el tick
+    // acaba de escribir el tamaño del titulo.
+    hostTop = r.top + window.scrollY;
+    hostH   = r.height;
+    secTop  = rs.top + window.scrollY;
+    secH    = rs.height || 1;
+    stickH  = stick.offsetHeight || window.innerHeight;
+    renderer.setSize(stick.offsetWidth, stickH, false);
+    renderer.getDrawingBufferSize(uniforms.uRes.value);
   }
   resize();
-  window.addEventListener('resize', resize);
+  onLayout(resize);
 
   // Solo dibuja cuando la seccion esta en pantalla
-  let visible = false, raf = null, t0 = performance.now();
+  let visible = false, raf = null, t0 = performance.now(), last = 0;
+  let shown = REDUCED ? 1 : 0;   // progreso suavizado: persigue al scroll
+  let idle  = false;
+  // Fuera de pantalla el loop no corre y el progreso suavizado queda viejo: al
+  // volver arrancaria desde otro lugar y la lluvia se desarmaria de golpe.
+  let resync = true;
   new IntersectionObserver(es => es.forEach(e => {
     visible = e.isIntersecting;
-    if (visible && !raf) raf = requestAnimationFrame(loop);
+    if (visible && !raf) { last = 0; resync = true; raf = requestAnimationFrame(loop); }
   }), { rootMargin: '15% 0px' }).observe(host);
 
   function loop(now) {
     if (!visible) { raf = null; return; }
-    uniforms.uTime.value = (now - t0) / 1000;
-    renderer.render(scene, camera);
     raf = requestAnimationFrame(loop);
+    const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+    last = now;
+
+    const vh = window.innerHeight;
+    const sy = window.scrollY;
+
+    // p = 0 con la seccion asomando abajo, 1 cuando su borde llega arriba
+    const p = Math.max(0, Math.min(1, 1 - (secTop - sy) / vh));
+    if (resync) { shown = REDUCED ? 1 : p; resync = false; }
+    if (!REDUCED) {
+      // Inercia: la lluvia llega un poco despues que el scroll y frena suave
+      shown += (p - shown) * (1 - Math.exp(-dt * 5));
+      if (Math.abs(p - shown) < 0.0005) shown = p;
+
+      // Antes de entrar no hay nada que pintar: un frame limpio y se frena
+      if (shown <= 0) { if (idle) return; idle = true; } else idle = false;
+
+      uniforms.uProg.value = shown;
+      uniforms.uFill.value = shown >= 1 ? 1 : 0;
+    }
+
+    // Donde esta el canvas sticky: pegado arriba, salvo al final del fondo
+    const top = Math.min(Math.max(hostTop - sy, 0), hostTop + hostH - stickH - sy);
+    uniforms.uTopVh.value  = top / vh;
+    uniforms.uCanH.value   = stickH / vh;
+    uniforms.uSecOff.value = (sy - secTop) / vh;
+    uniforms.uSecH.value   = secH / vh;
+    uniforms.uTime.value   = (now - t0) / 1000;
+    renderer.render(scene, camera);
   }
 }
 
@@ -911,7 +1048,7 @@ function setupCodeRain(host) {
 // codigo. Vite lo empaqueta y en dev recarga al guardar.
 import rawManifesto from '../manifiesto.txt?raw';
 
-let mfHead = null;   // { el, title, top, len, bigFs }
+let mfWordTick = null;   // disparo del dibujo de la palabra, se engancha al tick
 let mfDrop = null;   // chequeo de la caida, se engancha al tick
 
 function parseThread(txt) {
@@ -944,12 +1081,7 @@ function setupManifesto() {
   const sec = document.getElementById('manifesto');
   if (!sec) return;
 
-  const headEl = document.getElementById('mfHead');
-  const title  = document.getElementById('manifestoTitle');
-  if (headEl && title) {
-    mfHead = { el: headEl, title, top: 0, len: 1, bigFs: 0, lastT: -1, lastE: -1 };
-    measureManifesto();
-  }
+  setupManifestoWord();
 
   const thread   = document.getElementById('mfThread');
   const composer = document.getElementById('mfComposer');
@@ -1093,71 +1225,554 @@ function setupManifesto() {
       draftEl.textContent = draftText;
     }
   });
-
-  onLayout(measureManifesto);
-}
-
-function measureManifesto() {
-  if (!mfHead) return;
-  mfHead.top = mfHead.el.getBoundingClientRect().top + window.scrollY;
-  // El encogido dura 55vh. Tiene que quedar cerca del alto del track (.mf-head
-  // en el CSS) o se vuelve a abrir el hueco entre el titulo y la charla.
-  mfHead.len = window.innerHeight * 0.55;
-  fitManifestoTitle();
-}
-
-// Mide el ancho real del texto y despeja el cuerpo que lo hace llegar a los
-// bordes. Con un divisor fijo habria que adivinar el avance de la fuente.
-function fitManifestoTitle() {
-  const t = mfHead.title;
-  const keep = { fs: t.style.fontSize, ls: t.style.letterSpacing, fw: t.style.fontWeight };
-
-  t.style.fontSize      = '100px';
-  t.style.fontWeight    = '800';
-  t.style.letterSpacing = '-4px';                  // -0.04em a 100px
-  const w = t.getBoundingClientRect().width;
-
-  t.style.fontSize      = keep.fs;
-  t.style.fontWeight    = keep.fw;
-  t.style.letterSpacing = keep.ls;
-
-  mfHead.bigFs = w ? (100 * (window.innerWidth * 0.96) / w) : window.innerWidth * 0.13;
 }
 
 function updateManifesto() {
-  if (!mfHead) return;
+  if (mfWordTick) mfWordTick();
+}
 
-  // El titulo se achica de gigante a rotulo a lo largo del track
-  const vh = window.innerHeight;
+// ─── PALABRA "MANIFESTO" ─────────────────────────────────────────────────────
+// Caligrafica (Mrs Sheppards) y armada con los contornos reales de la fuente:
+// cuando el gradiente termina de llenar la pantalla se dibuja el trazo y
+// aparecen los nodos vectoriales, como en un editor. Al pasar el mouse se
+// llena de liquido desde abajo.
+// Se lee el .ttf con opentype.js porque el texto renderizado no expone curvas.
+// Gris topo oscuro y no negro pleno: sobre el coral el negro cortaba demasiado
+const MF_INK = '#463F3A';
 
-  // Dos progresos distintos:
-  //  t  = el encogido, que arranca cuando la seccion llega al borde superior
-  //  e  = la ENTRADA, que corre mientras la palabra sube desde abajo
-  // El peso va con e: si fuera con t, la palabra se quedaria fina todo el viaje
-  // y recien engordaria al empezar a achicarse.
-  const p = Math.max(0, Math.min(1, (scrollY - mfHead.top) / mfHead.len));
-  const t = smoothstep(p);
-  // Termina cuando la seccion entro un 22%, que es cuando la palabra ya se lee
-  // entera en pantalla
-  const e = smoothstep(Math.max(0, Math.min(1, (scrollY - (mfHead.top - vh)) / (vh * 0.22))));
+function mfSvg(tag, attrs = {}) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
 
-  if (Math.abs(t - mfHead.lastT) < 0.002 && Math.abs(e - mfHead.lastE) < 0.002) return;
-  mfHead.lastT = t;
-  mfHead.lastE = e;
-  const big = mfHead.bigFs || window.innerWidth * 0.13;
-  // En mobile el rotulo final es mas chico: a 50px ocupaba todo el ancho y
-  // quedaba debajo de los botones del nav
-  const end = isMobile() ? 30 : 50;
-  const st  = mfHead.title.style;
-  st.fontSize      = lerp(big, end, t).toFixed(2) + 'px';
-  // Invertido respecto al hero: alla el titular va de 900 a 100 al scrollear;
-  // aca la palabra entra fina y se va engrosando mientras se achica.
-  st.fontWeight    = Math.round(lerp(200, 800, e));
-  // El tracking en px, no en em: en em cambiaria solo por achicarse el cuerpo
-  // Menos tracking negativo al arrancar: con peso 200 las letras son finitas
-  // y el -0.04em las empastaba una contra otra.
-  st.letterSpacing = lerp(big * -0.02, 2.42 * end / 50, t).toFixed(2) + 'px';
-  st.opacity       = lerp(1, 0.40, t).toFixed(3);
+// Encuadre de la camara de la palabra. La M ocupa CAM_M_FRAC del ancho de
+// pantalla al estar de cerca. El punto que se mira (interpolado entre la M y el
+// final) va al punto focal: el centro horizontal y 54% de alto, como en reposo.
+// x' = F + (x - P) * s, que con z = 0 es el encuadre normal.
+//
+// Se escribe como transform de SVG sobre un <g>, en unidades del viewBox, y no
+// como transform CSS del <svg>: el CSS escala una textura ya rasterizada y de
+// cerca se pixelaba. Asi el navegador redibuja los vectores en cada cuadro.
+//
+// Ademas del paneo (u) y el zoom (z), la camara tiene:
+//   r   roll en grados (un dutch tilt leve que acompaña el paneo)
+//   arc el paneo no va en linea recta: sube un poco a mitad, como una grua
+//   el zoom respira: a mitad del paneo se abre apenas, como un operador que
+//   retrocede al acelerar, y vuelve a cerrarse al frenar
+const CAM_M_FRAC = 0.68;
+// Curvas de la camara. pan: salida muy larga y llegada larga, sin tramo lineal.
+// pull: el zoom out junta envion y despues se va de golpe, frenando largo.
+CustomEase.create('mf.pan',  'M0,0 C0.5,0 0.22,1 1,1');
+CustomEase.create('mf.pull', 'M0,0 C0.72,0 0.14,1 1,1');
+function applyCamera(svg, cam, vb) {
+  const w = svg.clientWidth;
+  if (!w || !cam.g) return;
+  const k = w / vb.w;                               // px por unidad del viewBox
+  const S = Math.min(4.5, Math.max(1.6, (window.innerWidth * CAM_M_FRAC) / (cam.mW * k)));
+  const zp = Math.max(0, cam.z);                    // el overshoot del zoom no mueve el paneo
+  const mid = Math.sin(Math.PI * Math.min(1, Math.max(0, cam.u)));
+  const zEff = cam.z * (1 - 0.14 * mid);
+  const s = 1 + (S - 1) * zEff;
+  const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2;
+  const pu = (cam.from.x + (cam.to.x - cam.from.x) * cam.u - cx) * zp;
+  const pv = (cam.from.y + (cam.to.y - cam.from.y) * cam.u - cy - mid * cam.arc) * zp;
+  cam.g.setAttribute('transform',
+    `rotate(${cam.r.toFixed(3)} ${cx.toFixed(2)} ${cy.toFixed(2)}) ` +
+    `translate(${(cx - s * (cx + pu)).toFixed(3)} ${(cy - s * (cy + pv)).toFixed(3)}) scale(${s.toFixed(4)})`);
+}
+
+function setupManifestoWord() {
+  const head  = document.getElementById('mfHead');
+  const title = document.getElementById('manifestoTitle');
+  const inner = head && head.querySelector('.mf-head-inner');
+  if (!head || !title || !inner) return;
+
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let font = null, word = null;
+
+  // ── Armado del SVG para el texto del idioma actual ──
+  function build() {
+    if (word) { word.tl.kill(); word.svg.remove(); word = null; }
+    const text = title.textContent.trim();
+    // Sin los glifos vacios (espacios): los indices tienen que coincidir
+    const glyphs = font.getPaths(text, 0, 0, 100).filter(g => g.commands.length);
+    const bb = font.getPath(text, 0, 0, 100).getBoundingBox();
+    const pad = 4;
+    const vb = { x: bb.x1 - pad, y: bb.y1 - pad, w: bb.x2 - bb.x1 + pad * 2, h: bb.y2 - bb.y1 + pad * 2 };
+
+    const svg = mfSvg('svg', {
+      class: 'mf-word', viewBox: `${vb.x} ${vb.y} ${vb.w} ${vb.h}`, 'aria-hidden': 'true',
+    });
+    const uid = 'mfw' + Math.random().toString(36).slice(2, 7);
+    const defs = mfSvg('defs');
+
+    // Los glifos se pisan donde una letra se engancha con la otra. Para que el
+    // contorno sea el de la palabra entera y no se vean las uniones por dentro,
+    // se traza al doble de grosor y la mitad de adentro la tapa la mascara.
+    const mask = mfSvg('mask', { id: uid + 'm', maskUnits: 'userSpaceOnUse',
+      x: vb.x, y: vb.y, width: vb.w, height: vb.h });
+    mask.appendChild(mfSvg('rect', { x: vb.x, y: vb.y, width: vb.w, height: vb.h, fill: '#fff' }));
+    const clip = mfSvg('clipPath', { id: uid + 'c' });
+    const ds = glyphs.map(g => g.toPathData(2));
+    ds.forEach(d => {
+      mask.appendChild(mfSvg('path', { d, fill: '#000' }));
+      clip.appendChild(mfSvg('path', { d }));
+    });
+    defs.append(mask, clip);
+    svg.appendChild(defs);
+
+    // Brillo que barre la palabra cuando termina de llenarse
+    const grad = mfSvg('linearGradient', { id: uid + 's', x1: '0', x2: '1', y1: '0', y2: '0' });
+    [['0', 0], ['0.5', 0.32], ['1', 0]].forEach(([o, a]) =>
+      grad.appendChild(mfSvg('stop', { offset: o, 'stop-color': '#FFF0D9', 'stop-opacity': a })));
+    defs.appendChild(grad);
+
+    // Liquido: dos capas de ola recortadas por la palabra, el menisco (la linea
+    // de luz que corre sobre la superficie) y el brillo final
+    const liquid = mfSvg('g', { 'clip-path': `url(#${uid}c)` });
+    const waveBack  = mfSvg('path', { fill: MF_INK, opacity: '0.28' });
+    const waveFront = mfSvg('path', { fill: MF_INK });
+    const meniscus  = mfSvg('path', { fill: 'none', stroke: '#FFF0D9', 'stroke-width': '0.7',
+      'stroke-linecap': 'round', opacity: '0' });
+    const sheenW = (bb.x2 - bb.x1) * 0.22;
+    const sheen = mfSvg('rect', { x: bb.x1 - pad - sheenW, y: vb.y, width: sheenW, height: vb.h,
+      fill: `url(#${uid}s)`, transform: 'skewX(-18)', opacity: '0' });
+    liquid.append(waveBack, waveFront, meniscus, sheen);
+    svg.appendChild(liquid);
+
+    // Trazo: grosor medido en la referencia (~2.6px con la palabra a 1092px)
+    // pasado a unidades del viewBox, y duplicado por la mascara
+    const strokeW = (2.6 / 1092) * (bb.x2 - bb.x1) * 2;
+    const strokes = mfSvg('g', { mask: `url(#${uid}m)`, fill: 'none', stroke: MF_INK,
+      'stroke-width': strokeW.toFixed(3), 'stroke-linejoin': 'round' });
+    // Hueco 2 y offset 1.01 (no 1 1 / 1): con eso quedaba un guion de largo
+    // casi cero al inicio de cada trazo, invisible en reposo pero una mota
+    // clara con la camara de cerca
+    const strokeEls = ds.map(d => {
+      const p = mfSvg('path', { d, pathLength: '1', 'stroke-dasharray': '1 2', 'stroke-dashoffset': '1.01' });
+      strokes.appendChild(p);
+      return p;
+    });
+    svg.appendChild(strokes);
+
+    // Nodos: los puntos de anclaje reales de cada glifo. Los que caen dentro
+    // de otra letra no se ven en el contorno, asi que tampoco se muestran.
+    const probe = document.createElement('canvas').getContext('2d');
+    const p2d = ds.map(d => new Path2D(d));
+    const nodeSize = (5 / 1092) * (bb.x2 - bb.x1);
+    const nodes = mfSvg('g', { class: 'mf-nodes' });
+    const nodeList = [];   // { el, gi, f } — f: fraccion del recorrido del glifo
+    // La fuente es TrueType: cada curva trae muchos puntos seguidos y con todos
+    // se veia una fila de cuadraditos. Se deja uno cada NODE_GAP unidades como
+    // minimo (~390 → ~115 por palabra), que sigue leyendose como editor.
+    const NODE_GAP = 12;
+    glyphs.forEach((g, gi) => {
+      const pts = g.commands.filter(c => c.type !== 'Z');
+      let lx = null, ly = null;
+      pts.forEach((c, k) => {
+        if (c.type !== 'M' && lx !== null && Math.hypot(c.x - lx, c.y - ly) < NODE_GAP) return;
+        lx = c.x; ly = c.y;
+        const hidden = p2d.some((p, j) => j !== gi && probe.isPointInPath(p, c.x, c.y));
+        if (hidden) return;
+        const r = mfSvg('rect', {
+          x: (c.x - nodeSize / 2).toFixed(2), y: (c.y - nodeSize / 2).toFixed(2),
+          width: nodeSize.toFixed(2), height: nodeSize.toFixed(2),
+          'stroke-width': (nodeSize * 0.22).toFixed(2),
+        });
+        nodes.appendChild(r);
+        nodeList.push({ el: r, gi, f: k / Math.max(1, pts.length - 1) });
+      });
+    });
+    svg.appendChild(nodes);
+
+    // Reticula de construccion, congruente con la palabra: las horizontales son
+    // las metricas reales de la fuente (descendente, base, altura de x, de
+    // mayuscula, ascendente) y las verticales pasan por el nodo mas a la
+    // izquierda de cada letra, asi los nodos caen sobre la grilla.
+    // Se desborda del viewBox hacia los costados para leerse como grilla de
+    // pantalla y no como un recuadro alrededor de la palabra.
+    const ww = bb.x2 - bb.x1;
+    const s = 100 / font.unitsPerEm;
+    const os2 = font.tables.os2 || {};
+    const rows = [font.descender, 0, os2.sxHeight, os2.sCapHeight, font.ascender]
+      .filter(v => typeof v === 'number').map(v => -v * s);
+    const gx1 = bb.x1 - ww * 0.45, gx2 = bb.x2 + ww * 0.45;
+    const gy1 = Math.min(...rows) - 14, gy2 = Math.max(...rows) + 14;
+    const cols = glyphs.map(g => Math.min(...g.commands.filter(c => c.type !== 'Z').map(c => c.x)));
+    cols.push(bb.x2);
+    const grid = mfSvg('g', { class: 'mf-grid', stroke: MF_INK, fill: 'none', opacity: '0.22' });
+    const gridLines = [
+      ...rows.map(y => `M${gx1.toFixed(2)} ${y.toFixed(2)}H${gx2.toFixed(2)}`),
+      ...cols.map(x => `M${x.toFixed(2)} ${gy1.toFixed(2)}V${gy2.toFixed(2)}`),
+    ].map(d => {
+      // 1px con la palabra a 1092px, la misma regla que el trazo. Sin
+      // non-scaling-stroke: combinado con pathLength, Chrome mide el guion en
+      // px de pantalla y la linea quedaba cortada a mitad.
+      const p = mfSvg('path', { d, pathLength: '1', 'stroke-dasharray': '1 2', 'stroke-dashoffset': '1.01',
+        'stroke-width': (ww / 1092).toFixed(3) });
+      grid.appendChild(p);
+      return p;
+    });
+    // Detras de todo: la palabra se escribe encima de la grilla
+    svg.insertBefore(grid, liquid);
+    inner.appendChild(svg);
+    title.classList.add('mf-title--sr');
+
+    // ── Dibujado: glifo por glifo, y cada nodo aparece cuando pasa la linea ──
+    const DRAW = 1.5, STAG = 0.11;
+    const tl = gsap.timeline({ paused: true });
+    // Primero la grilla, linea por linea: horizontales y despues verticales.
+    // El trazo arranca cuando la grilla va por la mitad (LEAD).
+    const LEAD = 0.55;
+    const nRows = rows.length;
+    gridLines.forEach((p, i) => {
+      const at = i < nRows ? i * 0.07 : nRows * 0.07 + (i - nRows) * 0.04;
+      tl.to(p, { attr: { 'stroke-dashoffset': 0 }, duration: i < nRows ? 0.55 : 0.45, ease: 'power3.inOut' }, at);
+    });
+    strokeEls.forEach((p, i) => {
+      tl.to(p, { attr: { 'stroke-dashoffset': 0 }, duration: DRAW, ease: 'power2.inOut' }, LEAD + i * STAG);
+    });
+    nodeList.forEach(n => {
+      gsap.set(n.el, { opacity: 0, scale: 0, transformOrigin: '50% 50%' });
+      // Sale apenas despues de que la linea pasa por su lugar
+      tl.to(n.el, { opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(2.5)' },
+            LEAD + n.gi * STAG + DRAW * (0.15 + 0.8 * n.f));
+    });
+
+    // El llenado no espera al final del timeline (los ultimos nodos) sino a la
+    // ultima letra, y arranca un poco antes: el expo tarda ~0.3s en mover el
+    // nivel, asi el liquido se ve subir justo cuando la letra termina.
+    // Al rebobinar tambien pasa por aca, pero onDrawn corta si no esta shown.
+    const fillAt = LEAD + (strokeEls.length - 1) * STAG + DRAW - 0.25;
+    tl.call(onDrawn, null, fillAt);
+
+    // ── Camara de cine ──
+    // Arranca muy cerca, mirando la parte izquierda de la M, se desliza hasta
+    // el final de la palabra mientras se escribe y, cuando se llena, se aleja
+    // al encuadre normal. Va dentro del mismo timeline: siempre en sincronia,
+    // se rebobina con el y el cambio de idioma la deja en reposo.
+    // u: 0 = la M, 1 = el final. z: 1 = de cerca, 0 = encuadre normal.
+    const g0 = glyphs[0].getBoundingBox(), gN = glyphs[glyphs.length - 1].getBoundingBox();
+    // Todo el contenido va en un <g> de camara; las defs quedan afuera (las
+    // mascaras se resuelven en el espacio del elemento que las usa, asi que
+    // siguen a la camara igual)
+    const camG = mfSvg('g', { class: 'mf-cam' });
+    [...svg.childNodes].filter(n => n !== defs).forEach(n => camG.appendChild(n));
+    svg.appendChild(camG);
+
+    const cam = { u: 0.015, z: 1.08, r: -1.2, g: camG,
+      arc: (bb.y2 - bb.y1) * 0.05,
+      // Medido en la referencia: la M ocupa ~68% del ancho de pantalla y el
+      // centro de cuadro cae a un 28% de su ancho
+      from: { x: g0.x1 + (g0.x2 - g0.x1) * 0.28, y: (g0.y1 + g0.y2) / 2 },
+      to:   { x: (gN.x1 + gN.x2) / 2, y: (gN.y1 + gN.y2) / 2 },
+      mW: g0.x2 - g0.x1 };
+    const applyCam = () => applyCamera(svg, cam, vb);
+    const C = { onUpdate: applyCam };
+
+    // Keyframes, con los principios de siempre: nunca un movimiento lineal ni
+    // un arranque en seco. Cada tramo sale lento, acelera y se asienta, y los
+    // cambios de direccion llevan anticipacion y un leve pasarse de largo.
+    const PAN_T = LEAD + 0.15;
+    const PAN_D = fillAt - PAN_T + 0.1;
+    tl.set(cam, { u: 0.015, z: 1.08, r: -1.2, ...C }, 0);
+    // 1. Asentamiento: mientras aparece la grilla la camara termina de entrar
+    //    (push-in lento) y se corre apenas hacia atras: anticipa el paneo
+    tl.to(cam, { z: 1, duration: PAN_T + 0.2, ease: 'power2.out', ...C }, 0);
+    tl.to(cam, { u: -0.02, r: -1.6, duration: PAN_T, ease: 'sine.inOut', ...C }, 0);
+    // 2. Travelling: sale muy suave, toma velocidad a mitad de palabra y llega
+    //    un poquito pasado; el roll y el arco lo acompañan
+    tl.to(cam, { u: 1.015, r: 0.8, duration: PAN_D, ease: 'mf.pan', ...C }, PAN_T);
+    tl.to(cam, { u: 1, duration: 0.6, ease: 'sine.inOut', ...C }, PAN_T + PAN_D);
+    // 3. Zoom out con el liquido: un empujon corto hacia adentro (anticipacion),
+    //    el tiron hacia atras, un leve pasarse y el asentamiento
+    tl.to(cam, { keyframes: [
+      { z: 1.05, duration: 0.28, ease: 'power2.inOut' },
+      { z: -0.02, duration: 1.1, ease: 'mf.pull' },
+      { z: 0, duration: 0.55, ease: 'sine.inOut' },
+    ], ...C }, fillAt);
+    tl.to(cam, { r: 0, duration: 1.4, ease: 'power3.inOut', ...C }, fillAt + 0.2);
+    applyCam();
+    onLayout(applyCam);
+
+    word = { svg, tl, cam, grid, waveBack, waveFront, meniscus, sheen, sheenW, nodes, vb, top: bb.y1, bottom: bb.y2,
+             x1: bb.x1 - pad, x2: bb.x2 + pad, level: { v: 0 }, fillTween: null };
+    if (REDUCED) { tl.progress(1, true); word.level.v = 1; }
+    drawWaves(0);
+    // Cambio de idioma con la palabra ya puesta: se repone entera y llena
+    if (shown) {
+      tl.progress(1, true);   // true: sin disparar el recorrido de nuevo
+      word.level.v = filled ? 1 : 0; drawWaves(0); svg.classList.add('is-live');
+      if (filled) grid.style.opacity = '0';
+    }
+  }
+
+  // ── Liquido ──
+  // Superficie: dos senos que viajan en sentidos opuestos. Se agita mas
+  // mientras el nivel se mueve, como un vaso que se esta llenando.
+  let raf = null, lastLevel = 0, slosh = 0;
+  // Devuelve la linea de la superficie; cerrada hacia abajo es la ola
+  function surface(level, t, amp, phase) {
+    const { x1, x2, top, bottom } = word;
+    // Nivel 0: las crestas quedan por debajo de la letra mas baja. Nivel 1: los
+    // valles quedan por encima de la mas alta.
+    const y0 = bottom + amp * 3 - (bottom - top + amp * 6) * level;
+    const N = 48;
+    let d = '';
+    for (let i = 0; i <= N; i++) {
+      const x = x1 + (x2 - x1) * i / N;
+      const y = y0 + Math.sin(x * 0.09 + t * 2.1 + phase) * amp
+                   + Math.sin(x * 0.047 - t * 1.4 + phase * 2) * amp * 0.6;
+      d += (i ? 'L' : 'M') + x.toFixed(2) + ' ' + y.toFixed(2);
+    }
+    return d;
+  }
+  const close = d => d + `L${word.x2} ${word.bottom + 20}L${word.x1} ${word.bottom + 20}Z`;
+  function drawWaves(t) {
+    const lv = word.level.v;
+    const amp = 1.6 + slosh;
+    word.waveBack.setAttribute('d', close(surface(Math.min(1, lv * 1.04 + 0.01), t, amp * 1.1, 1.7)));
+    const top = surface(lv, t, amp, 0);
+    word.waveFront.setAttribute('d', close(top));
+    // El menisco se ve mientras sube y se apaga al llegar a los extremos
+    word.meniscus.setAttribute('d', top);
+    word.meniscus.setAttribute('opacity', (Math.sin(Math.PI * lv) * 0.75).toFixed(3));
+    // Los nodos se van con el llenado: lleno ya no es un contorno editable
+    word.nodes.style.opacity = (1 - lv).toFixed(3);
+  }
+  function loop(now) {
+    if (!word) { raf = null; return; }
+    const lv = word.level.v;
+    // Con el expo el tramo del medio sube de golpe: mas margen para agitarse
+    slosh += (Math.min(5, Math.abs(lv - lastLevel) * 160) - slosh) * 0.08;
+    lastLevel = lv;
+    drawWaves(now / 1000);
+    // Vacio o lleno y quieto: nada que animar
+    if ((lv <= 0 || lv >= 1) && slosh < 0.02 && !word.fillTween?.isActive()) { raf = null; return; }
+    raf = requestAnimationFrame(loop);
+  }
+  function kick() { if (!raf) raf = requestAnimationFrame(loop); }
+
+  function fillTo(v, dur, ease = 'power2.inOut') {
+    if (!word) return;
+    word.fillTween?.kill();
+    word.fillTween = gsap.to(word.level, { v, duration: dur, ease, onUpdate: kick });
+    kick();
+  }
+
+  // Llenado de cine: arranca lento como juntando envion, sube de golpe y se
+  // asienta suave (expo), mientras la camara se aleja (va en el timeline). Al
+  // quedar llena la cruza un brillo.
+  function cinematicFill(dur) {
+    const w = word;
+    fillTo(1, dur, 'expo.inOut');
+    // La grilla ya cumplio: con la letra llena se difumina
+    gsap.to(w.grid, { opacity: 0, duration: dur * 1.2, ease: 'power2.out' });
+    gsap.fromTo(w.sheen,
+      { attr: { x: w.x1 - w.sheenW * 1.5 }, opacity: 1 },
+      { attr: { x: w.x2 + w.sheenW * 0.5 }, duration: 0.9, delay: dur * 0.8, ease: 'power2.inOut',
+        onComplete: () => gsap.set(w.sheen, { opacity: 0 }) });
+  }
+
+  // ── Recorrido guiado ──
+  // Del hero se salta directo al manifiesto; ahi la pagina se queda quieta
+  // mientras se dibuja el trazo, al segundo se llena de liquido y despues baja
+  // sola, suave, hasta la charla. Ruedita para arriba en cualquier momento
+  // corta el recorrido y devuelve el scroll.
+  const FILL_DELAY = 0;        // el adelanto ya esta en el tl.call del timeline
+  const FILL_DUR   = 0.9;      // con expo: casi todo el nivel sube en el tercio del medio
+  const TO_CHAT    = 1.1;      // s de la bajada hasta la charla
+  const easeInOut  = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+  let shown = false, filled = false, secTop = 0, jumping = false, guided = false;
+  const guideCalls = [];
+  const sec  = document.getElementById('manifesto');
+  const wrap = sec.querySelector('.mf-wrap');
+  function measure() { secTop = sec.getBoundingClientRect().top + window.scrollY; }
+  measure();
+  onLayout(measure);
+
+  function later(s, fn) { const c = gsap.delayedCall(s, fn); guideCalls.push(c); return c; }
+  function endGuide() {
+    guideCalls.splice(0).forEach(c => c.kill());
+    guided = false;
+    if (lenis && lenis.isStopped) lenis.start();
+  }
+
+  // Trazo terminado: si la pagina esta en el manifiesto, arranca lo demas
+  // La pagina se congela recien cuando termino el salto: cortar una animacion
+  // de Lenis a mitad deja su estado interno colgado y despues ignora scrollTo
+  function freeze() {
+    if (!guided) return;
+    if (jumping) { later(0.1, freeze); return; }
+    lenis.stop();
+  }
+
+  function onDrawn() {
+    if (!shown || REDUCED) return;
+    const near = Math.abs(window.scrollY - secTop) < window.innerHeight * 0.25;
+    if (near && lenis) { guided = true; freeze(); }
+    later(FILL_DELAY, () => {
+      filled = true;
+      cinematicFill(FILL_DUR);
+      if (!guided) return;
+      // Arranca a bajar con el brillo todavia cruzando la palabra
+      later(FILL_DUR + 0.5, () => {
+        lenis.start();
+        // La primera burbuja queda a un quinto de la pantalla desde arriba
+        const target = wrap.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.2;
+        // Sin lock: si se interrumpe, un lock a medio soltar traba el scroll
+        lenis.scrollTo(target, { duration: TO_CHAT, easing: easeInOut, force: true,
+          onComplete: () => { guided = false; } });
+      });
+    });
+  }
+
+  // Intencion de bajar desde el hero: rueda, teclado. Por eventos y no por la
+  // posicion, para no secuestrar los scrolls programados (el boton Works del
+  // section-nav pasa por el hero bajando).
+  function wantsDown(e) {
+    if (!lenis || jumping || guided || isPanelOpen || REDUCED) return;
+    if (window.scrollY >= secTop - window.innerHeight * 0.55) return;
+    jumping = true;
+    // Con lock: una sola muesca de rueda manda varios eventos y sin lock los
+    // siguientes pisan el salto. Es seguro porque freeze() espera a que termine.
+    lenis.scrollTo(secTop, { duration: 1.8, easing: easeInOut, lock: true,
+      onComplete: () => { jumping = false; } });
+    // Por si algo corta la animacion y el onComplete no llega
+    gsap.delayedCall(2.2, () => { jumping = false; });
+  }
+  window.addEventListener('wheel', e => {
+    if (e.deltaY > 0) wantsDown(e);
+    // Para arriba en medio del recorrido: se corta y el scroll vuelve a ser suyo
+    else if (e.deltaY < 0 && guided) endGuide();
+  }, { passive: true });
+  window.addEventListener('keydown', e => {
+    if (['ArrowDown', 'PageDown', ' ', 'Spacebar'].includes(e.key) && !e.target.closest('input, textarea')) wantsDown(e);
+    if (['ArrowUp', 'PageUp'].includes(e.key) && guided) endGuide();
+  });
+
+  // La palabra solo existe dentro del gradiente: su pantalla se recorta en el
+  // borde de la seccion. Si no, al frenar a mitad y volver el snap al hero,
+  // quedaba dibujada encima del titular.
+  let lastClip = -1;
+  mfWordTick = () => {
+    if (!word) return;
+    const vh  = window.innerHeight;
+    const off = window.scrollY - secTop;          // 0 = borde de la seccion arriba
+    // La pantalla de la palabra esta pegada arriba (sticky) desde una pantalla
+    // antes del borde; el recorte es lo que queda de ahi hasta el borde
+    const innerTop = Math.max(0, -off - vh);
+    const clip = Math.round(Math.min(vh, Math.max(0, -off - innerTop)));
+    if (clip !== lastClip) {
+      lastClip = clip;
+      inner.style.clipPath = clip > 0 ? `inset(${clip}px 0 0 0)` : '';
+    }
+    // -0.5vh: el borde de la seccion va por la mitad de la pantalla
+    if (!shown && off >= -vh * 0.5) {
+      shown = true;
+      word.svg.classList.add('is-live');
+      // La grilla vuelve si se habia difuminado en una pasada anterior
+      gsap.killTweensOf(word.grid);
+      word.grid.style.opacity = '';
+      word.tl.timeScale(1).play();
+    } else if (shown && off < -vh * 0.9) {
+      // Volvio a subir: se borra rapido para dibujarse de nuevo al entrar
+      shown = false;
+      filled = false;
+      endGuide();
+      word.svg.classList.remove('is-live');
+      word.tl.timeScale(2.5).reverse();
+      fillTo(0, 0.6);
+    }
+  };
+
+  fetch(mrsSheppardsUrl)
+    .then(r => r.arrayBuffer())
+    .then(buf => { font = opentype.parse(buf); build(); })
+    .catch(e => console.warn('[manifesto] sin fuente vectorial, queda el texto', e));
+
+  // "Manifesto" / "Manifiesto": otra palabra, otras curvas
+  onLangChange(() => { if (font) build(); });
+}
+
+// ─── CAMARA DEL MANIFIESTO ───────────────────────────────────────────────────
+// Como el hero de unseen.co: el mouse mueve una camara que orbita el centro de
+// la pantalla. Lo cercano se desplaza mas que lo lejano (la palabra va al
+// fondo, cada burbuja a su propia profundidad) y todo gira apenas hacia donde
+// esta la camara. Mucha inercia: se acomoda despacio.
+//
+// Se escribe en las propiedades sueltas translate/rotate y no en transform: el
+// transform ya lo usan el pop de GSAP y la fisica de la caida, y el navegador
+// compone las tres cosas.
+const CAM_SHIFT = 42;    // px de desplazamiento a profundidad 1, mouse en el borde
+const CAM_TILT  = 5;     // grados de giro a profundidad 1
+const CAM_EASE  = 3.2;   // mas bajo = mas inercia
+
+function setupManifestoCamera() {
+  if (isTouch()) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const sec  = document.getElementById('manifesto');
+  const wrap = sec && sec.querySelector('.mf-wrap');
+  if (!sec || !wrap) return;
+
+  // Profundidad por elemento. Las burbujas alternan entre cerca y lejos para
+  // que al mover la camara se despeguen unas de otras.
+  const DEPTHS = [1.25, 0.8, 1.4, 0.95, 1.15, 0.75, 1.3, 0.9];
+  function layers() {
+    const out = [];
+    const w = sec.querySelector('.mf-word');
+    if (w) out.push({ el: w, d: 0.45 });
+    sec.querySelectorAll('.mf-msg, .mf-composer').forEach((el, i) => {
+      out.push({ el, d: DEPTHS[i % DEPTHS.length] });
+    });
+    return out;
+  }
+
+  let tx = 0, ty = 0;       // objetivo, -1..1 desde el centro de la pantalla
+  let cx = 0, cy = 0;       // camara suavizada
+  window.addEventListener('pointermove', e => {
+    tx = (e.clientX / window.innerWidth)  * 2 - 1;
+    ty = (e.clientY / window.innerHeight) * 2 - 1;
+  }, { passive: true });
+  // El mouse se fue de la ventana: la camara vuelve al centro
+  document.documentElement.addEventListener('pointerleave', () => { tx = ty = 0; });
+
+  let visible = false, raf = null, last = 0;
+  new IntersectionObserver(es => es.forEach(e => {
+    visible = e.isIntersecting;
+    if (visible && !raf) { last = 0; raf = requestAnimationFrame(loop); }
+  })).observe(sec);
+
+  function loop(now) {
+    if (!visible) { raf = null; return; }
+    raf = requestAnimationFrame(loop);
+    const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+    last = now;
+
+    const k = 1 - Math.exp(-dt * CAM_EASE);
+    const nx = cx + (tx - cx) * k, ny = cy + (ty - cy) * k;
+    if (Math.abs(nx - cx) < 1e-4 && Math.abs(ny - cy) < 1e-4) return;   // quieta
+    cx = nx; cy = ny;
+
+    // La perspectiva sale del centro de la pantalla, no del centro del hilo
+    // (que mide varias pantallas): asi la camara es una sola para todos.
+    const wr = wrap.getBoundingClientRect();
+    wrap.style.perspectiveOrigin = `50% ${(window.innerHeight / 2 - wr.top).toFixed(0)}px`;
+
+    for (const { el, d } of layers()) {
+      // Camara a la derecha: la escena se corre a la izquierda y se ve mas de
+      // su lado derecho (rotateY negativo). Igual en vertical.
+      const x = -cx * CAM_SHIFT * d, y = -cy * CAM_SHIFT * d;
+      const rx = cy * CAM_TILT * d, ry = -cx * CAM_TILT * d;
+      const mag = Math.hypot(rx, ry);
+      el.style.translate = `${x.toFixed(2)}px ${y.toFixed(2)}px`;
+      el.style.rotate = mag > 0.001
+        ? `${(rx / mag).toFixed(4)} ${(ry / mag).toFixed(4)} 0 ${mag.toFixed(3)}deg`
+        : '';
+    }
+  }
 }
 
 // ─── CAIDA DE LAS BURBUJAS ───────────────────────────────────────────────────
@@ -2156,6 +2771,139 @@ if (typeof ResizeObserver !== 'undefined') {
   new ResizeObserver(relayout).observe(scrollContentEl);
 }
 onLayout(buildSnapPoints);
+
+// ─── ROLL DE LETRAS EN LINKS Y BOTONES ───────────────────────────────────────
+// Al pasar por encima, cada letra gira como una ranura: la original sale por
+// arriba y una copia identica entra desde abajo. La copia es un text-shadow
+// desplazado una linea, asi que cada letra lleva un solo span animado.
+// La ola arranca en la letra donde entra el cursor y se abre hacia los dos
+// lados; moviendose adentro, las letras que pisa vuelven a girar.
+const ROLL_SEL   = 'a, button';
+const ROLL_DUR   = 0.34;     // s por letra
+const ROLL_STAG  = 0.024;    // s entre una letra y la siguiente
+
+function setupTextRoll() {
+  if (isTouch()) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  // Parte en letras los textos sueltos de un link o boton. Se puede llamar
+  // de nuevo: solo toca los nodos de texto que todavia no estan partidos
+  // (el cambio de idioma reescribe el textContent y los vuelve a dejar crudos).
+  function split(el) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        if (!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const p = n.parentElement;
+        if (!p || p.closest('.rl-t, i, svg')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    if (!nodes.length) return;
+
+    // Un lector de pantalla leeria letra por letra: el nombre va entero en el
+    // aria-label y las letras quedan ocultas.
+    if (!el.hasAttribute('aria-label')) el.dataset.rlLabel = '1';
+
+    nodes.forEach(n => {
+      // Un solo span por texto: dentro de un flex, los espacios sueltos entre
+      // palabras colapsan y "Check my X" quedaria pegado.
+      const wrap = document.createElement('span');
+      wrap.className = 'rl-t';
+      wrap.setAttribute('aria-hidden', 'true');
+      n.nodeValue.split(/(\s+)/).forEach(part => {
+        if (!part) return;
+        if (/^\s+$/.test(part)) { wrap.appendChild(document.createTextNode(part)); return; }
+        // La palabra no se corta entre renglones: los inline-block si dejarian
+        const word = document.createElement('span');
+        word.className = 'rl-w';
+        for (const ch of part) {
+          const c = document.createElement('span');
+          c.className = 'rl';
+          const inner = document.createElement('span');
+          inner.className = 'rl-i';
+          inner.textContent = ch;
+          c.appendChild(inner);
+          word.appendChild(c);
+        }
+        wrap.appendChild(word);
+      });
+      n.replaceWith(wrap);
+    });
+
+    if (el.dataset.rlLabel) {
+      el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
+    }
+    // Texto vertical (section-nav): la letra va de costado, asi que "arriba"
+    // de la letra es un eje fisico distinto
+    el.classList.toggle('rl-v', getComputedStyle(el).writingMode.startsWith('vertical'));
+  }
+
+  function splitAll() { document.querySelectorAll(ROLL_SEL).forEach(split); }
+  splitAll();
+  onLangChange(splitAll);
+
+  function roll(c, delay) {
+    if (c._rolling) return;          // a mitad de giro no se reinicia: saltaria
+    c._rolling = true;
+    const inner = c.firstChild;
+    const v = c.closest('.rl-v');
+    // El paso es el alto de la ranura, padding incluido: es lo que mide el
+    // text-shadow en el CSS
+    const to = v ? { x: c.offsetWidth } : { y: -c.offsetHeight };
+    gsap.fromTo(inner, { x: 0, y: 0 }, {
+      ...to, duration: ROLL_DUR, ease: 'power2.inOut', delay,
+      onComplete: () => { gsap.set(inner, { x: 0, y: 0 }); c._rolling = false; },
+    });
+  }
+
+  // Letras visibles con su centro. El switch tiene dos textos y uno esta oculto.
+  function measure(el) {
+    return [...el.querySelectorAll('.rl')]
+      .map(c => ({ c, r: c.getBoundingClientRect() }))
+      .filter(o => o.r.width > 0)
+      .map(o => ({ c: o.c, x: o.r.left + o.r.width / 2, y: o.r.top + o.r.height / 2 }));
+  }
+  function nearest(chars, x, y) {
+    let best = -1, bd = Infinity;
+    chars.forEach((o, i) => {
+      const d = Math.hypot(o.x - x, (o.y - y) * 2);   // la fila pesa mas que la columna
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
+  }
+
+  let cur = null, chars = [], last = -1;
+
+  document.addEventListener('pointerover', e => {
+    const el = e.target.closest(ROLL_SEL);
+    if (!el || el === cur) return;
+    split(el);                        // por si se armo despues (chat, idioma)
+    cur   = el;
+    chars = measure(el);
+    if (!chars.length) { cur = null; return; }
+    last = nearest(chars, e.clientX, e.clientY);
+    chars.forEach((o, i) => roll(o.c, Math.abs(i - last) * ROLL_STAG));
+  });
+
+  document.addEventListener('pointerout', e => {
+    if (!cur) return;
+    if (e.relatedTarget && cur.contains(e.relatedTarget)) return;
+    cur = null; chars = []; last = -1;
+  });
+
+  document.addEventListener('pointermove', e => {
+    if (!cur || !chars.length) return;
+    const k = nearest(chars, e.clientX, e.clientY);
+    if (k === last) return;
+    last = k;
+    // La letra que pisa y sus vecinas, apenas despues
+    roll(chars[k].c, 0);
+    if (chars[k - 1]) roll(chars[k - 1].c, ROLL_STAG * 1.5);
+    if (chars[k + 1]) roll(chars[k + 1].c, ROLL_STAG * 1.5);
+  }, { passive: true });
+}
 
 // ─── MAGNETIC EFFECT ─────────────────────────────────────────────────────────
 function setupMagnetic() {

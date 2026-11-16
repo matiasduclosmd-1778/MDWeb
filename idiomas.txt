@@ -171,6 +171,12 @@ ES: Manual de Marca
 
 ---
 
+KEY: works.role5
+EN: AI Product · Fintech
+ES: Producto IA · Fintech
+
+---
+
 KEY: mf.title
 EN: Manifesto
 ES: Manifiesto
